@@ -489,7 +489,7 @@ git commit -m "feat: add Dexie schema for athlete/block/effort/session/log"
 
 **Interfaces:**
 - Consumes: nothing (pure functions).
-- Produces: `paceSecondsPerKm(distanceMeters, timeSeconds): number`, `splitsFromGoal(distanceMeters, goalTimeSeconds): { secondsPerKm, secondsPerMile, secondsPerLap400m }`, `riegelEquivalent(knownDistanceMeters, knownTimeSeconds, targetDistanceMeters, exponent?): number`, `trainingZonesFromBaseline(baselineDistanceMeters, baselineTimeSeconds): TrainingZones`, type `TrainingZones` — used by Task 9 (Dashboard) for zone/split display.
+- Produces: `paceSecondsPerKm(distanceMeters, timeSeconds): number`, `splitsFromGoal(distanceMeters, goalTimeSeconds): { secondsPerKm, secondsPerMile, secondsPerLap400m }`, `riegelEquivalent(knownDistanceMeters, knownTimeSeconds, targetDistanceMeters, exponent?): number`, `trainingZonesFromBaseline(baselineDistanceMeters, baselineTimeSeconds): TrainingZones`, type `TrainingZones` — not consumed by any other phase-1 task; ships and tests the pace-math module ahead of its use in phase 2's workout library and race-week split displays (same intentional-seam pattern as Task 5's adapter).
 
 - [ ] **Step 1: Write failing tests**
 
@@ -1442,7 +1442,7 @@ git commit -m "feat: add onboarding wizard"
 
 **Interfaces:**
 - Consumes: `getBlock`, `listEffortsForBlock`, `getNextUnloggedSession` from `../../db/repository` (Task 6); `assessFeasibility` from `../../lib/feasibility` (Task 4); `useLiveQuery` from `dexie-react-hooks`; `db` from `../../db/schema`.
-- Produces: `<BlockDashboard blockId={string} />`, `<ProgressionChart efforts={TimedEffort[]} />`, `<FeasibilityBanner result={FeasibilityResult} goalTimeSeconds={number} />` — used by Task 11 (App routing).
+- Produces: `<BlockDashboard blockId={string} />`, `<ProgressionChart efforts={TimedEffort[]} />`, `<FeasibilityBanner result={FeasibilityResult} />` — used by Task 11 (App routing).
 
 - [ ] **Step 1: Write failing test**
 
