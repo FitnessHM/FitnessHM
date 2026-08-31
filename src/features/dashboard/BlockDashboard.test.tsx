@@ -29,6 +29,18 @@ test('shows goal, days remaining, gap to goal, and next session', async () => {
   expect(screen.getByText(/days remaining/i)).toBeInTheDocument();
 });
 
+test('shows a TBD current best when the block has no efforts yet', async () => {
+  const targetDate = new Date(Date.now() + 42 * 86400000).toISOString().slice(0, 10);
+  const block = await createBlock({
+    eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'time', goalTimeSeconds: 1380,
+    targetDate, baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
+  });
+
+  render(<BlockDashboard blockId={block.id} onStartNewBlock={() => {}} />);
+
+  expect(await screen.findByText(/current best: TBD — take your baseline test/i)).toBeInTheDocument();
+});
+
 test('renders safely when the block has an empty target date', async () => {
   const block = await createBlock({
     eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'time', goalTimeSeconds: 1350,

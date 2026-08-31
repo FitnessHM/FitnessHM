@@ -43,8 +43,10 @@ export default function BlockDashboard({ blockId, onStartNewBlock }: Props) {
 
       {feasibility && <FeasibilityBanner result={feasibility} />}
 
-      {currentBest && (
+      {currentBest ? (
         <p>Current best: {Math.round(currentBest.timeSeconds)}s on {currentBest.date}</p>
+      ) : (
+        <p>Current best: TBD — take your baseline test</p>
       )}
 
       <section>
