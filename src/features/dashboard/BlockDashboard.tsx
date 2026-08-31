@@ -6,9 +6,10 @@ import FeasibilityBanner from './FeasibilityBanner';
 
 interface Props {
   blockId: string;
+  onStartNewBlock: () => void;
 }
 
-export default function BlockDashboard({ blockId }: Props) {
+export default function BlockDashboard({ blockId, onStartNewBlock }: Props) {
   const block = useLiveQuery(() => db.blocks.get(blockId), [blockId]);
   const efforts = useLiveQuery(() => db.efforts.where('blockId').equals(blockId).sortBy('date'), [blockId]);
   const sessions = useLiveQuery(() => db.sessions.where('blockId').equals(blockId).sortBy('date'), [blockId]);
@@ -59,6 +60,14 @@ export default function BlockDashboard({ blockId }: Props) {
           <p className="text-slate-400">No upcoming session scheduled.</p>
         )}
       </section>
+
+      <button
+        type="button"
+        onClick={onStartNewBlock}
+        className="w-full py-3 bg-slate-800 rounded font-semibold text-slate-300"
+      >
+        Start a new block
+      </button>
     </div>
   );
 }

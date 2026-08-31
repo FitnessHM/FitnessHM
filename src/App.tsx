@@ -63,7 +63,7 @@ export default function App() {
   if (blockId) {
     return (
       <main className="min-h-screen bg-slate-950 text-slate-100">
-        <BlockDashboard blockId={blockId} />
+        <BlockDashboard blockId={blockId} onStartNewBlock={() => setView({ name: 'onboarding' })} />
         <div className="max-w-2xl mx-auto px-6 pb-6">
           <button
             type="button"

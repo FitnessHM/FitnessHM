@@ -22,7 +22,7 @@ test('shows goal, days remaining, gap to goal, and next session', async () => {
     targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: 1200, note: 'Builds threshold.',
   });
 
-  render(<BlockDashboard blockId={block.id} />);
+  render(<BlockDashboard blockId={block.id} onStartNewBlock={() => {}} />);
 
   expect(await screen.findByText(/5K/)).toBeInTheDocument();
   expect(await screen.findByText(/tempo/i)).toBeInTheDocument();
@@ -37,7 +37,7 @@ test('shows a feasibility warning for an unrealistic goal', async () => {
   });
   await addTimedEffort({ blockId: block.id, date: '2026-08-01', distanceMeters: 5000, timeSeconds: 1530, kind: 'baseline' });
 
-  render(<BlockDashboard blockId={block.id} />);
+  render(<BlockDashboard blockId={block.id} onStartNewBlock={() => {}} />);
 
   expect(await screen.findByText(/adjust/i)).toBeInTheDocument();
 });
