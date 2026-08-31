@@ -26,6 +26,12 @@ export default function OnboardingWizard({ onComplete }: Props) {
   const [daysPerWeek, setDaysPerWeek] = useState(3);
   const [otherTraining, setOtherTraining] = useState<OtherTraining[]>([]);
 
+  const goalTimeSeconds = parseMmSs(goalTime);
+  const baselineTimeSeconds = parseMmSs(baselineTime);
+  const step1Valid = goalType !== 'time' || goalTimeSeconds !== null;
+  const step2Valid = targetDate !== '';
+  const step3Valid = baselineSource === 'unknown' || baselineTimeSeconds !== null;
+
   const toggleOtherTraining = (option: OtherTraining) => {
     setOtherTraining((prev) => (prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]));
   };
@@ -33,12 +39,11 @@ export default function OnboardingWizard({ onComplete }: Props) {
   const handleFinish = async () => {
     await saveAthlete(daysPerWeek, otherTraining);
     const eventDistanceMeters = EVENTS[eventLabel];
-    const goalTimeSeconds = goalType === 'time' ? parseMmSs(goalTime) : null;
     const block = await createBlock({
       eventDistanceMeters,
       eventLabel,
       goalType,
-      goalTimeSeconds,
+      goalTimeSeconds: goalType === 'time' ? goalTimeSeconds : null,
       targetDate,
       baselineSource,
       raceMantra: null,
@@ -46,7 +51,6 @@ export default function OnboardingWizard({ onComplete }: Props) {
     });
 
     if (baselineSource !== 'unknown') {
-      const baselineTimeSeconds = parseMmSs(baselineTime);
       if (baselineTimeSeconds !== null) {
         await addTimedEffort({
           blockId: block.id,
@@ -92,9 +96,12 @@ export default function OnboardingWizard({ onComplete }: Props) {
             <label className="block">
               Goal time (mm:ss)
               <input aria-label="goal time" value={goalTime} onChange={(e) => setGoalTime(e.target.value)} placeholder="23:00" className="block w-full mt-1 bg-slate-900 p-2 rounded" />
+              {goalTime !== '' && goalTimeSeconds === null && (
+                <p className="text-amber-300 text-sm">Enter a time as mm:ss, e.g. 23:00</p>
+              )}
             </label>
           )}
-          <button type="button" onClick={() => setStep(2)} className="w-full py-3 bg-blue-600 rounded font-semibold">Next</button>
+          <button type="button" disabled={!step1Valid} onClick={() => setStep(2)} className="w-full py-3 bg-blue-600 rounded font-semibold disabled:opacity-50">Next</button>
         </fieldset>
       )}
 
@@ -104,7 +111,7 @@ export default function OnboardingWizard({ onComplete }: Props) {
             Target date
             <input aria-label="target date" type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
           </label>
-          <button type="button" onClick={() => setStep(3)} className="w-full py-3 bg-blue-600 rounded font-semibold">Next</button>
+          <button type="button" disabled={!step2Valid} onClick={() => setStep(3)} className="w-full py-3 bg-blue-600 rounded font-semibold disabled:opacity-50">Next</button>
         </fieldset>
       )}
 
@@ -122,9 +129,12 @@ export default function OnboardingWizard({ onComplete }: Props) {
             <label className="block">
               Baseline time (mm:ss)
               <input aria-label="baseline time" value={baselineTime} onChange={(e) => setBaselineTime(e.target.value)} placeholder="25:30" className="block w-full mt-1 bg-slate-900 p-2 rounded" />
+              {baselineTime !== '' && baselineTimeSeconds === null && (
+                <p className="text-amber-300 text-sm">Enter a time as mm:ss, e.g. 25:30</p>
+              )}
             </label>
           )}
-          <button type="button" onClick={() => setStep(4)} className="w-full py-3 bg-blue-600 rounded font-semibold">Next</button>
+          <button type="button" disabled={!step3Valid} onClick={() => setStep(4)} className="w-full py-3 bg-blue-600 rounded font-semibold disabled:opacity-50">Next</button>
         </fieldset>
       )}
 

@@ -19,6 +19,15 @@ test('assessFeasibility marks an achievable goal as feasible with no suggestion'
   expect(result.suggestedTargetDate).toBeNull();
 });
 
+test('assessFeasibility returns a safe no-warning result for an invalid target date', () => {
+  const today = new Date('2026-08-30');
+  const result = assessFeasibility(1530, 1350, today, new Date(''));
+  expect(result.isFeasible).toBe(true);
+  expect(result.maxSustainableSecondsPerWeek).toBe(0);
+  expect(result.suggestedGoalTimeSeconds).toBeNull();
+  expect(result.suggestedTargetDate).toBeNull();
+});
+
 test('assessFeasibility flags an unrealistic goal and suggests an achievable alternative', () => {
   const today = new Date('2026-08-30');
   const targetDate = new Date('2026-09-13'); // 2 weeks — too fast for a 3-minute drop

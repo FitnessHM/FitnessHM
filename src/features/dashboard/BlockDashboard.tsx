@@ -21,7 +21,10 @@ export default function BlockDashboard({ blockId, onStartNewBlock }: Props) {
 
   const today = new Date();
   const targetDate = new Date(block.targetDate);
-  const daysRemaining = Math.max(Math.ceil((targetDate.getTime() - today.getTime()) / 86400000), 0);
+  const hasValidTargetDate = Number.isFinite(targetDate.getTime());
+  const daysRemaining = hasValidTargetDate
+    ? Math.max(Math.ceil((targetDate.getTime() - today.getTime()) / 86400000), 0)
+    : '—';
 
   const loggedSessionIds = new Set(logs.map((l) => l.sessionId).filter((id): id is string => id !== null));
   const nextSession = sessions.find((s) => !loggedSessionIds.has(s.id) && s.date >= today.toISOString().slice(0, 10));

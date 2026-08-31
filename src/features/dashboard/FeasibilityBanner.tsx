@@ -20,7 +20,7 @@ export default function FeasibilityBanner({ result }: Props) {
       <p>
         A sustainable pace suggests {result.suggestedGoalTimeSeconds ? formatMmSs(result.suggestedGoalTimeSeconds) : '—'} by
         your target date, or your current goal time by{' '}
-        {result.suggestedTargetDate ? result.suggestedTargetDate.toISOString().slice(0, 10) : '—'}.
+        {Number.isFinite(result.suggestedTargetDate?.getTime()) ? result.suggestedTargetDate!.toISOString().slice(0, 10) : '—'}.
         Consider adjusting one of them.
       </p>
     </div>

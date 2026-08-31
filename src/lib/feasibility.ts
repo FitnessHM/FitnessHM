@@ -39,6 +39,12 @@ export function assessFeasibility(
   today: Date,
   targetDate: Date
 ): FeasibilityResult {
+  // Without a valid target date there is nothing meaningful to assess, so report
+  // "nothing to warn about" rather than propagating an Invalid Date to callers.
+  if (!Number.isFinite(targetDate.getTime())) {
+    return { isFeasible: true, maxSustainableSecondsPerWeek: 0, suggestedGoalTimeSeconds: null, suggestedTargetDate: null };
+  }
+
   const { weeksRemaining, requiredSecondsPerWeek } = requiredImprovementRate(
     currentBestSeconds,
     goalTimeSeconds,
