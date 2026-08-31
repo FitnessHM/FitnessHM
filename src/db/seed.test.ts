@@ -19,6 +19,12 @@ test('seeds one example block with an effort and prescribed sessions when empty'
   expect(sessions.length).toBeGreaterThanOrEqual(3);
 });
 
+test('two concurrent seed calls still create only one block', async () => {
+  await Promise.all([seedExampleBlockIfEmpty(), seedExampleBlockIfEmpty()]);
+  const blocks = await db.blocks.toArray();
+  expect(blocks).toHaveLength(1);
+});
+
 test('does nothing if a block already exists', async () => {
   await seedExampleBlockIfEmpty();
   const firstRunBlocks = await db.blocks.toArray();
