@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { GoalType, BaselineSource, OtherTraining } from '../../db/schema';
 import { saveAthlete, createBlock, addTimedEffort, createPrescribedSession } from '../../db/repository';
+import { isoDateLocal, todayIso } from '../../lib/dates';
 
 const EVENTS: Record<string, number> = { Mile: 1609, '5K': 5000, '10K': 10000, 'Half Marathon': 21097.5, Marathon: 42195 };
 const OTHER_TRAINING_OPTIONS: OtherTraining[] = ['lifting', 'sport', 'classes', 'none'];
@@ -54,14 +55,14 @@ export default function OnboardingWizard({ onComplete }: Props) {
       if (baselineTimeSeconds !== null) {
         await addTimedEffort({
           blockId: block.id,
-          date: new Date().toISOString().slice(0, 10),
+          date: todayIso(),
           distanceMeters: eventDistanceMeters,
           timeSeconds: baselineTimeSeconds,
           kind: 'baseline',
         });
       }
     } else {
-      const weekOne = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const weekOne = isoDateLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
       await createPrescribedSession({
         blockId: block.id,
         date: weekOne,

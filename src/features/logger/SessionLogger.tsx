@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { PrescribedSession, CutShortReason } from '../../db/schema';
 import { createSessionLog, countCutShortReasons, addTimedEffort } from '../../db/repository';
+import { todayIso } from '../../lib/dates';
 import ReasonCountTable from './ReasonCountTable';
 
 interface Props {
@@ -26,7 +27,7 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
   const toNumberOrNull = (value: string) => (value.trim() === '' ? null : Number(value));
 
   const handleSave = async () => {
-    const date = new Date().toISOString().slice(0, 10);
+    const date = todayIso();
     const actualDurationSeconds = toNumberOrNull(actualDuration);
     const actualDistanceMeters = toNumberOrNull(actualDistance);
 

@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/schema';
 import { assessFeasibility } from '../../lib/feasibility';
+import { todayIso } from '../../lib/dates';
 import ProgressionChart from './ProgressionChart';
 import FeasibilityBanner from './FeasibilityBanner';
 
@@ -20,14 +21,16 @@ export default function BlockDashboard({ blockId, onStartNewBlock }: Props) {
   }
 
   const today = new Date();
-  const targetDate = new Date(block.targetDate);
+  // Parse as local midnight; `new Date('2026-11-01')` would be UTC midnight,
+  // which skews days-remaining by a day for most timezones.
+  const targetDate = new Date(block.targetDate + 'T00:00:00');
   const hasValidTargetDate = Number.isFinite(targetDate.getTime());
   const daysRemaining = hasValidTargetDate
     ? Math.max(Math.ceil((targetDate.getTime() - today.getTime()) / 86400000), 0)
     : '—';
 
   const loggedSessionIds = new Set(logs.map((l) => l.sessionId).filter((id): id is string => id !== null));
-  const nextSession = sessions.find((s) => !loggedSessionIds.has(s.id) && s.date >= today.toISOString().slice(0, 10));
+  const nextSession = sessions.find((s) => !loggedSessionIds.has(s.id) && s.date >= todayIso());
 
   const currentBest = efforts.length > 0 ? efforts[efforts.length - 1] : undefined;
   const feasibility = currentBest && block.goalTimeSeconds != null

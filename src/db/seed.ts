@@ -1,8 +1,8 @@
 import { db } from './schema';
 import { createBlock, addTimedEffort, createPrescribedSession } from './repository';
+import { isoDateLocal } from '../lib/dates';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
 export async function seedExampleBlockIfEmpty(): Promise<void> {
   // One transaction so the count check and the inserts are atomic: React
@@ -20,7 +20,7 @@ export async function seedExampleBlockIfEmpty(): Promise<void> {
       eventLabel: '5K',
       goalType: 'time',
       goalTimeSeconds: 23 * 60,
-      targetDate: isoDate(targetDate),
+      targetDate: isoDateLocal(targetDate),
       baselineSource: 'known',
       raceMantra: null,
       targetSplitSecondsPerKm: null,
@@ -28,7 +28,7 @@ export async function seedExampleBlockIfEmpty(): Promise<void> {
 
     await addTimedEffort({
       blockId: block.id,
-      date: isoDate(new Date(today.getTime() - 7 * DAY_MS)),
+      date: isoDateLocal(new Date(today.getTime() - 7 * DAY_MS)),
       distanceMeters: 5000,
       timeSeconds: 25 * 60 + 30,
       kind: 'baseline',
@@ -36,7 +36,7 @@ export async function seedExampleBlockIfEmpty(): Promise<void> {
 
     await createPrescribedSession({
       blockId: block.id,
-      date: isoDate(new Date(today.getTime() + 1 * DAY_MS)),
+      date: isoDateLocal(new Date(today.getTime() + 1 * DAY_MS)),
       type: 'easy',
       reps: null, targetPaceSecondsPerKm: null, targetRestSeconds: null,
       targetDurationSeconds: 30 * 60,
@@ -44,7 +44,7 @@ export async function seedExampleBlockIfEmpty(): Promise<void> {
     });
     await createPrescribedSession({
       blockId: block.id,
-      date: isoDate(new Date(today.getTime() + 3 * DAY_MS)),
+      date: isoDateLocal(new Date(today.getTime() + 3 * DAY_MS)),
       type: 'tempo',
       reps: null, targetPaceSecondsPerKm: 5 * 60, targetRestSeconds: null,
       targetDurationSeconds: 20 * 60,
@@ -52,7 +52,7 @@ export async function seedExampleBlockIfEmpty(): Promise<void> {
     });
     await createPrescribedSession({
       blockId: block.id,
-      date: isoDate(new Date(today.getTime() + 5 * DAY_MS)),
+      date: isoDateLocal(new Date(today.getTime() + 5 * DAY_MS)),
       type: 'long_run',
       reps: null, targetPaceSecondsPerKm: null, targetRestSeconds: null,
       targetDurationSeconds: 50 * 60,
@@ -60,7 +60,7 @@ export async function seedExampleBlockIfEmpty(): Promise<void> {
     });
     await createPrescribedSession({
       blockId: block.id,
-      date: isoDate(new Date(today.getTime() + 10 * DAY_MS)),
+      date: isoDateLocal(new Date(today.getTime() + 10 * DAY_MS)),
       type: 'time_trial',
       reps: null, targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: null,
       note: 'Checkpoint test — measures real progress against the goal.',

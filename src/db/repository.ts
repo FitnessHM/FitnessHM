@@ -2,6 +2,7 @@ import { db } from './schema';
 import type {
   Athlete, TrainingBlock, TimedEffort, PrescribedSession, SessionLog, OtherTraining,
 } from './schema';
+import { todayIso } from '../lib/dates';
 
 export async function getAthlete(): Promise<Athlete | undefined> {
   return db.athlete.get(1);
@@ -51,7 +52,7 @@ export async function getNextUnloggedSession(blockId: string): Promise<Prescribe
   const sessions = await listSessionsForBlock(blockId);
   const logs = await listLogsForBlock(blockId);
   const loggedSessionIds = new Set(logs.map((l) => l.sessionId).filter((id): id is string => id !== null));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   return sessions.find((s) => !loggedSessionIds.has(s.id) && s.date >= today);
 }
 
