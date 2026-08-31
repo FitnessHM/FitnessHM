@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { PrescribedSession, CutShortReason } from '../../db/schema';
-import { createSessionLog, countCutShortReasons } from '../../db/repository';
+import { createSessionLog, countCutShortReasons, addTimedEffort } from '../../db/repository';
 import ReasonCountTable from './ReasonCountTable';
 
 interface Props {
@@ -26,13 +26,17 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
   const toNumberOrNull = (value: string) => (value.trim() === '' ? null : Number(value));
 
   const handleSave = async () => {
+    const date = new Date().toISOString().slice(0, 10);
+    const actualDurationSeconds = toNumberOrNull(actualDuration);
+    const actualDistanceMeters = toNumberOrNull(actualDistance);
+
     await createSessionLog({
       sessionId: session?.id ?? null,
       blockId,
-      date: new Date().toISOString().slice(0, 10),
+      date,
       actualReps: toNumberOrNull(actualReps),
-      actualDurationSeconds: toNumberOrNull(actualDuration),
-      actualDistanceMeters: toNumberOrNull(actualDistance),
+      actualDurationSeconds,
+      actualDistanceMeters,
       recoveryScore: toNumberOrNull(recoveryScore),
       sleepHours: toNumberOrNull(sleepHours),
       temperatureC: toNumberOrNull(temperatureC),
@@ -40,6 +44,19 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
       note: note.trim() === '' ? null : note,
       cutShortReason: cutShortReason === '' ? null : cutShortReason,
     });
+
+    // A logged time trial is a real checkpoint measurement — record it so the
+    // progression chart and feasibility read keep moving after the baseline.
+    if (session?.type === 'time_trial' && actualDistanceMeters !== null && actualDurationSeconds !== null) {
+      await addTimedEffort({
+        blockId,
+        date,
+        distanceMeters: actualDistanceMeters,
+        timeSeconds: actualDurationSeconds,
+        kind: 'checkpoint',
+      });
+    }
+
     onSaved();
   };
 
