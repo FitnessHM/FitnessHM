@@ -78,9 +78,9 @@ export class FitnessHMDatabase extends Dexie {
     this.version(1).stores({
       athlete: 'id',
       blocks: 'id, targetDate, createdAt',
-      efforts: 'id, blockId, date',
-      sessions: 'id, blockId, date',
-      logs: 'id, blockId, sessionId, date',
+      efforts: 'id, blockId, date, [blockId+date]',
+      sessions: 'id, blockId, date, [blockId+date]',
+      logs: 'id, blockId, sessionId, date, [blockId+date]',
     });
   }
 }
