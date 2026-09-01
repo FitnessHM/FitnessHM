@@ -30,11 +30,8 @@ test('completing the wizard with a known baseline creates athlete, block, and ef
   await user.type(screen.getByLabelText(/baseline time/i), '25:30');
   await user.click(screen.getByRole('button', { name: /next/i }));
 
-  // Step 4: days per week
+  // Step 4: days per week + other training, in one screen
   fireEvent.change(screen.getByLabelText(/days per week/i), { target: { value: '4' } });
-  await user.click(screen.getByRole('button', { name: /next/i }));
-
-  // Step 5: other training
   await user.click(screen.getByLabelText(/lifting/i));
   await user.click(screen.getByRole('button', { name: /finish/i }));
 
@@ -69,13 +66,34 @@ test('choosing "no idea" baseline creates a week-1 time trial instead of an effo
   await user.selectOptions(screen.getByLabelText(/baseline/i), 'unknown');
   await user.click(screen.getByRole('button', { name: /next/i }));
 
-  fireEvent.change(screen.getByLabelText(/days per week/i), { target: { value: '3' } });
-  await user.click(screen.getByRole('button', { name: /next/i }));
-
   await user.click(screen.getByRole('button', { name: /finish/i }));
 
   const blocks = await db.blocks.toArray();
   const sessions = await db.sessions.where('blockId').equals(blocks[0].id).toArray();
   expect(sessions).toHaveLength(1);
   expect(sessions[0].type).toBe('time_trial');
+});
+
+test('the back button returns to the previous question without losing later steps', async () => {
+  const user = userEvent.setup();
+  render(<OnboardingWizard onComplete={vi.fn()} />);
+
+  await user.selectOptions(screen.getByLabelText(/event/i), '5K');
+  await user.selectOptions(screen.getByLabelText(/goal type/i), 'finish');
+  await user.click(screen.getByRole('button', { name: /next/i }));
+  expect(await screen.findByLabelText(/target date/i)).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /back/i }));
+  expect(await screen.findByLabelText(/event/i)).toBeInTheDocument();
+});
+
+test('showWelcome renders an intro screen that must be dismissed before the first question', async () => {
+  const user = userEvent.setup();
+  render(<OnboardingWizard onComplete={vi.fn()} showWelcome />);
+
+  expect(screen.queryByLabelText(/event/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/FitnessHM/)).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /get started/i }));
+  expect(await screen.findByLabelText(/event/i)).toBeInTheDocument();
 });

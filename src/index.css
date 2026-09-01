@@ -2,4 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root { height: 100%; }
+/*
+  Design tokens -- the single source of truth for color, referenced by
+  tailwind.config.js as `bg-bg`, `text-accent`, etc. Never hardcode a hex
+  value or a Tailwind slate/blue/etc. class in a component -- add or reuse
+  a token here instead.
+
+  Direction: a track scoreboard, not a wellness app. Near-black instrument
+  panel, one volt accent used only for the primary action / live state /
+  current pace. Everything else is near-monochrome so the accent actually
+  reads as "this matters right now."
+*/
+:root {
+  --color-bg: #0b0d0f;
+  --color-surface: #15181b;
+  --color-surface-raised: #1d2125;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  --color-text-primary: #edf0f2;
+  --color-text-secondary: #9aa1a9;
+  --color-text-faint: #5c6369;
+
+  --color-accent: #c6ff3d;
+  --color-accent-foreground: #0b0d0f;
+
+  --color-success: #5fae7a;
+  --color-caution: #d9a441;
+  --color-alert: #d9645a;
+
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures everywhere a number needs to line up -- stat blocks,
+   splits, countdowns. Apply via the `tabular-nums` utility. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Press feedback: every tappable element scales down slightly. Combined
+   with Motion's whileTap where richer feedback is warranted. */
+.pressable {
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+.skeleton {
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+  background-color: var(--color-surface-raised);
+}

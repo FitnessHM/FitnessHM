@@ -3,7 +3,21 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { PrescribedSession, CutShortReason } from '../../db/schema';
 import { createSessionLog, countCutShortReasons, addTimedEffort } from '../../db/repository';
 import { todayIso } from '../../lib/dates';
+import Button from '../../components/Button';
+import Card from '../../components/Card';
+import { sessionTypeLabel } from '../../components/SessionTypeIcon';
 import ReasonCountTable from './ReasonCountTable';
+
+const FIELD_CLASSES = 'block w-full mt-1.5 bg-surface border border-border-strong rounded-control p-3 font-body text-body text-primary focus:outline-none focus:border-accent';
+const LABEL_CLASSES = 'block font-body text-label font-semibold uppercase tracking-wide text-secondary';
+
+// Progressive enhancement only -- silently does nothing on iOS Safari,
+// desktop, or any browser without the Vibration API.
+function vibrate(pattern: number | number[]) {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    navigator.vibrate(pattern);
+  }
+}
 
 interface Props {
   blockId: string;
@@ -46,7 +60,7 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
       cutShortReason: cutShortReason === '' ? null : cutShortReason,
     });
 
-    // A logged time trial is a real checkpoint measurement — record it so the
+    // A logged time trial is a real checkpoint measurement -- record it so the
     // progression chart and feasibility read keep moving after the baseline.
     if (session?.type === 'time_trial' && actualDistanceMeters !== null && actualDurationSeconds !== null) {
       await addTimedEffort({
@@ -58,76 +72,94 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
       });
     }
 
+    vibrate(40);
     onSaved();
   };
 
   return (
-    <div className="p-6 space-y-4 max-w-md mx-auto">
-      {session ? (
-        <p className="text-slate-300">
-          Prescribed: {session.reps ? `${session.reps} x ${session.type}` : session.type}
-          {session.targetDurationSeconds ? ` — ${Math.round(session.targetDurationSeconds / 60)} min` : ''}
-        </p>
-      ) : (
-        <p className="text-slate-400">Logging an unscheduled session.</p>
-      )}
+    <div className="mx-auto max-w-md space-y-5 p-4 pb-10">
+      <Card className="space-y-1">
+        {session ? (
+          <p className="font-body text-body text-primary">
+            <span className="font-display text-title">
+              {session.reps ? `${session.reps} x ${sessionTypeLabel(session.type)}` : sessionTypeLabel(session.type)}
+            </span>
+            {session.targetDurationSeconds ? (
+              <span className="ml-2 font-body text-caption text-secondary">
+                {Math.round(session.targetDurationSeconds / 60)} min target
+              </span>
+            ) : null}
+          </p>
+        ) : (
+          <p className="font-body text-body text-secondary">Logging an unscheduled session.</p>
+        )}
+      </Card>
 
-      {session?.reps != null && (
-        <label className="block">
-          Reps completed
-          <input aria-label="reps completed" value={actualReps} onChange={(e) => setActualReps(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
+      <div className="space-y-4">
+        {session?.reps != null && (
+          <label className={LABEL_CLASSES}>
+            Reps completed
+            <input aria-label="reps completed" value={actualReps} onChange={(e) => setActualReps(e.target.value)} className={FIELD_CLASSES} />
+          </label>
+        )}
+
+        <label className={LABEL_CLASSES}>
+          Duration (seconds)
+          <input aria-label="duration" value={actualDuration} onChange={(e) => setActualDuration(e.target.value)} className={FIELD_CLASSES} />
         </label>
-      )}
 
-      <label className="block">
-        Duration (seconds)
-        <input aria-label="duration" value={actualDuration} onChange={(e) => setActualDuration(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
-      </label>
+        <label className={LABEL_CLASSES}>
+          Distance (meters)
+          <input aria-label="distance" value={actualDistance} onChange={(e) => setActualDistance(e.target.value)} className={FIELD_CLASSES} />
+        </label>
 
-      <label className="block">
-        Distance (meters)
-        <input aria-label="distance" value={actualDistance} onChange={(e) => setActualDistance(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
-      </label>
+        <details className="group">
+          <summary className="cursor-pointer font-body text-caption font-semibold text-secondary">Optional details</summary>
+          <div className="mt-3 space-y-4">
+            <label className={LABEL_CLASSES}>
+              Recovery score (1-5)
+              <input aria-label="recovery score" value={recoveryScore} onChange={(e) => setRecoveryScore(e.target.value)} className={FIELD_CLASSES} />
+            </label>
+            <label className={LABEL_CLASSES}>
+              Sleep (hours)
+              <input aria-label="sleep hours" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className={FIELD_CLASSES} />
+            </label>
+            <label className={LABEL_CLASSES}>
+              Temperature (C)
+              <input aria-label="temperature" value={temperatureC} onChange={(e) => setTemperatureC(e.target.value)} className={FIELD_CLASSES} />
+            </label>
+            <label className={LABEL_CLASSES}>
+              RPE (1-10)
+              <input aria-label="rpe" value={rpe} onChange={(e) => setRpe(e.target.value)} className={FIELD_CLASSES} />
+            </label>
+            <label className={LABEL_CLASSES}>
+              Note
+              <textarea aria-label="note" value={note} onChange={(e) => setNote(e.target.value)} className={FIELD_CLASSES} />
+            </label>
+          </div>
+        </details>
 
-      <details className="text-sm">
-        <summary className="cursor-pointer text-slate-400">Optional details</summary>
-        <div className="space-y-3 mt-3">
-          <label className="block">
-            Recovery score (1-5)
-            <input aria-label="recovery score" value={recoveryScore} onChange={(e) => setRecoveryScore(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
-          </label>
-          <label className="block">
-            Sleep (hours)
-            <input aria-label="sleep hours" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
-          </label>
-          <label className="block">
-            Temperature (C)
-            <input aria-label="temperature" value={temperatureC} onChange={(e) => setTemperatureC(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
-          </label>
-          <label className="block">
-            RPE (1-10)
-            <input aria-label="rpe" value={rpe} onChange={(e) => setRpe(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
-          </label>
-          <label className="block">
-            Note
-            <textarea aria-label="note" value={note} onChange={(e) => setNote(e.target.value)} className="block w-full mt-1 bg-slate-900 p-2 rounded" />
-          </label>
-        </div>
-      </details>
+        <label className={LABEL_CLASSES}>
+          Cut short reason (optional)
+          <select
+            aria-label="cut short reason"
+            value={cutShortReason}
+            onChange={(e) => setCutShortReason(e.target.value as CutShortReason | '')}
+            className={FIELD_CLASSES}
+          >
+            <option value="">Not cut short</option>
+            <option value="heat">Heat</option>
+            <option value="fatigue">Fatigue</option>
+            <option value="pain">Pain</option>
+            <option value="time">Time</option>
+            <option value="life">Life</option>
+          </select>
+        </label>
+      </div>
 
-      <label className="block">
-        Cut short reason (optional)
-        <select aria-label="cut short reason" value={cutShortReason} onChange={(e) => setCutShortReason(e.target.value as CutShortReason | '')} className="block w-full mt-1 bg-slate-900 p-2 rounded">
-          <option value="">Not cut short</option>
-          <option value="heat">Heat</option>
-          <option value="fatigue">Fatigue</option>
-          <option value="pain">Pain</option>
-          <option value="time">Time</option>
-          <option value="life">Life</option>
-        </select>
-      </label>
-
-      <button type="button" onClick={handleSave} className="w-full py-3 bg-blue-600 rounded font-semibold">Save</button>
+      <Button onClick={handleSave} className="w-full">
+        Save
+      </Button>
 
       <ReasonCountTable counts={reasonCounts} />
     </div>
