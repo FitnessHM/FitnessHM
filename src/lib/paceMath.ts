@@ -58,3 +58,25 @@ export function trainingZonesFromBaseline(
   });
   return zones;
 }
+
+// Picks the strongest effort by Riegel-normalizing every effort to
+// targetDistanceMeters first — a slower-looking raw time at a longer
+// distance can be the genuinely better result once normalized, and a
+// same-distance comparison should always favor the faster time regardless
+// of which was logged more recently.
+export function bestEquivalentEffort<T extends { distanceMeters: number; timeSeconds: number }>(
+  efforts: T[],
+  targetDistanceMeters: number
+): T | null {
+  if (efforts.length === 0) return null;
+  let best = efforts[0];
+  let bestEquivalentSeconds = riegelEquivalent(best.distanceMeters, best.timeSeconds, targetDistanceMeters);
+  for (let i = 1; i < efforts.length; i++) {
+    const equivalentSeconds = riegelEquivalent(efforts[i].distanceMeters, efforts[i].timeSeconds, targetDistanceMeters);
+    if (equivalentSeconds < bestEquivalentSeconds) {
+      best = efforts[i];
+      bestEquivalentSeconds = equivalentSeconds;
+    }
+  }
+  return best;
+}

@@ -41,6 +41,7 @@ test('completing the wizard with a known baseline creates athlete, block, and ef
   const blocks = await db.blocks.toArray();
   expect(blocks).toHaveLength(1);
   expect(blocks[0].goalTimeSeconds).toBe(23 * 60);
+  expect(blocks[0].status).toBe('active');
 
   const athlete = await db.athlete.get(1);
   expect(athlete?.daysPerWeek).toBe(4);

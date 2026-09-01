@@ -9,6 +9,7 @@ export type SessionType =
 export type CutShortReason = 'heat' | 'fatigue' | 'pain' | 'time' | 'life';
 export type EffortKind = 'baseline' | 'checkpoint' | 'race';
 export type BaselineSource = 'known' | 'estimate' | 'unknown';
+export type BlockStatus = 'active' | 'archived';
 
 export interface Athlete {
   id: 1;
@@ -26,6 +27,7 @@ export interface TrainingBlock {
   baselineSource: BaselineSource;
   raceMantra: string | null;
   targetSplitSecondsPerKm: number | null;
+  status: BlockStatus;
   createdAt: string;
 }
 
@@ -82,6 +84,22 @@ export class FitnessHMDatabase extends Dexie {
       sessions: 'id, blockId, date, [blockId+date]',
       logs: 'id, blockId, sessionId, date, [blockId+date]',
     });
+    // v2 adds `status` to blocks so exactly one block can be "active" at a
+    // time (start-a-new-block archives the previous one instead of leaving
+    // it live forever). Existing installs get every block marked active on
+    // upgrade — matches pre-v2 behavior, where the newest block was implicitly
+    // "the" block.
+    this.version(2).stores({
+      athlete: 'id',
+      blocks: 'id, targetDate, createdAt, status',
+      efforts: 'id, blockId, date, [blockId+date]',
+      sessions: 'id, blockId, date, [blockId+date]',
+      logs: 'id, blockId, sessionId, date, [blockId+date]',
+    }).upgrade((tx) =>
+      tx.table('blocks').toCollection().modify((block) => {
+        block.status = 'active';
+      })
+    );
   }
 }
 

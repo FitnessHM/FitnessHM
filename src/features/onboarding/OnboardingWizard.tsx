@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { GoalType, BaselineSource, OtherTraining } from '../../db/schema';
-import { saveAthlete, createBlock, addTimedEffort, createPrescribedSession } from '../../db/repository';
+import { saveAthlete, startNewBlock, addTimedEffort, createPrescribedSession } from '../../db/repository';
 import { isoDateLocal, todayIso } from '../../lib/dates';
 
 const EVENTS: Record<string, number> = { Mile: 1609, '5K': 5000, '10K': 10000, 'Half Marathon': 21097.5, Marathon: 42195 };
@@ -40,7 +40,7 @@ export default function OnboardingWizard({ onComplete }: Props) {
   const handleFinish = async () => {
     await saveAthlete(daysPerWeek, otherTraining);
     const eventDistanceMeters = EVENTS[eventLabel];
-    const block = await createBlock({
+    const block = await startNewBlock({
       eventDistanceMeters,
       eventLabel,
       goalType,

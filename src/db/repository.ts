@@ -14,8 +14,10 @@ export async function saveAthlete(daysPerWeek: number, otherTraining: OtherTrain
   return athlete;
 }
 
-export async function createBlock(input: Omit<TrainingBlock, 'id' | 'createdAt'>): Promise<TrainingBlock> {
-  const block: TrainingBlock = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+export async function createBlock(
+  input: Omit<TrainingBlock, 'id' | 'createdAt' | 'status'>
+): Promise<TrainingBlock> {
+  const block: TrainingBlock = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString(), status: 'active' };
   await db.blocks.add(block);
   return block;
 }
@@ -24,8 +26,25 @@ export async function getBlock(id: string): Promise<TrainingBlock | undefined> {
   return db.blocks.get(id);
 }
 
-export async function getMostRecentBlock(): Promise<TrainingBlock | undefined> {
-  return db.blocks.orderBy('createdAt').last();
+export async function getActiveBlock(): Promise<TrainingBlock | undefined> {
+  return db.blocks.where('status').equals('active').first();
+}
+
+// Archives whatever block is currently active (if any) and creates the new
+// one as active, in one transaction, so there's never a moment with zero or
+// two active blocks. Use this for anything the user initiates as "a new
+// block" (onboarding); use createBlock directly only when there's no
+// existing block to worry about (e.g. the one-time demo seed).
+export async function startNewBlock(
+  input: Omit<TrainingBlock, 'id' | 'createdAt' | 'status'>
+): Promise<TrainingBlock> {
+  return db.transaction('rw', db.blocks, async () => {
+    const current = await getActiveBlock();
+    if (current) {
+      await db.blocks.update(current.id, { status: 'archived' });
+    }
+    return createBlock(input);
+  });
 }
 
 export async function addTimedEffort(input: Omit<TimedEffort, 'id'>): Promise<TimedEffort> {

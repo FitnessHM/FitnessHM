@@ -22,6 +22,7 @@ test('all tables exist and accept typed rows', async () => {
     baselineSource: 'known' as const,
     raceMantra: null,
     targetSplitSecondsPerKm: null,
+    status: 'active' as const,
     createdAt: '2026-08-30T00:00:00.000Z',
   };
   await db.blocks.put(block);

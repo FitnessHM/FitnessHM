@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/schema';
 import { assessFeasibility } from '../../lib/feasibility';
+import { bestEquivalentEffort, riegelEquivalent } from '../../lib/paceMath';
 import { todayIso } from '../../lib/dates';
 import ProgressionChart from './ProgressionChart';
 import FeasibilityBanner from './FeasibilityBanner';
@@ -32,9 +33,16 @@ export default function BlockDashboard({ blockId, onStartNewBlock }: Props) {
   const loggedSessionIds = new Set(logs.map((l) => l.sessionId).filter((id): id is string => id !== null));
   const nextSession = sessions.find((s) => !loggedSessionIds.has(s.id) && s.date >= todayIso());
 
-  const currentBest = efforts.length > 0 ? efforts[efforts.length - 1] : undefined;
-  const feasibility = currentBest && block.goalTimeSeconds != null
-    ? assessFeasibility(currentBest.timeSeconds, block.goalTimeSeconds, today, targetDate)
+  // The strongest effort, not the most recent one -- a slower checkpoint
+  // shouldn't displace a faster baseline just because it happened later, and
+  // an effort at a different distance is normalized via Riegel before
+  // comparing (a 10K time can be the "better" 5K-equivalent result).
+  const currentBest = bestEquivalentEffort(efforts, block.eventDistanceMeters) ?? undefined;
+  const currentBestEquivalentSeconds = currentBest
+    ? riegelEquivalent(currentBest.distanceMeters, currentBest.timeSeconds, block.eventDistanceMeters)
+    : null;
+  const feasibility = currentBestEquivalentSeconds !== null && block.goalTimeSeconds != null
+    ? assessFeasibility(currentBestEquivalentSeconds, block.goalTimeSeconds, today, targetDate)
     : null;
 
   return (

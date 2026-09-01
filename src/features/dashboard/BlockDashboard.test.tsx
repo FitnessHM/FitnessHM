@@ -29,6 +29,21 @@ test('shows goal, days remaining, gap to goal, and next session', async () => {
   expect(screen.getByText(/days remaining/i)).toBeInTheDocument();
 });
 
+test('picks the fastest effort as current best, not the most recently logged one', async () => {
+  const targetDate = new Date(Date.now() + 42 * 86400000).toISOString().slice(0, 10);
+  const block = await createBlock({
+    eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'time', goalTimeSeconds: 1380,
+    targetDate, baselineSource: 'known', raceMantra: null, targetSplitSecondsPerKm: null,
+  });
+  // Faster baseline logged first, slower checkpoint logged later.
+  await addTimedEffort({ blockId: block.id, date: '2026-08-01', distanceMeters: 5000, timeSeconds: 1530, kind: 'baseline' });
+  await addTimedEffort({ blockId: block.id, date: '2026-09-01', distanceMeters: 5000, timeSeconds: 1600, kind: 'checkpoint' });
+
+  render(<BlockDashboard blockId={block.id} onStartNewBlock={() => {}} />);
+
+  expect(await screen.findByText(/Current best: 1530s/)).toBeInTheDocument();
+});
+
 test('shows a TBD current best when the block has no efforts yet', async () => {
   const targetDate = new Date(Date.now() + 42 * 86400000).toISOString().slice(0, 10);
   const block = await createBlock({

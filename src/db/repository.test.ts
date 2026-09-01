@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, expect, test } from 'vitest';
 import { db } from './schema';
 import {
-  getAthlete, saveAthlete, createBlock, getBlock, getMostRecentBlock,
+  getAthlete, saveAthlete, createBlock, getBlock, getActiveBlock, startNewBlock,
   addTimedEffort, listEffortsForBlock, createPrescribedSession,
   listSessionsForBlock, getNextUnloggedSession, createSessionLog,
   listLogsForBlock, countCutShortReasons,
@@ -20,15 +20,36 @@ test('saveAthlete/getAthlete round-trip the singleton', async () => {
   expect(athlete?.otherTraining).toEqual(['lifting', 'sport']);
 });
 
-test('createBlock assigns id/createdAt and getBlock/getMostRecentBlock retrieve it', async () => {
+test('createBlock assigns id/createdAt/active status and getBlock retrieves it', async () => {
   const block = await createBlock({
     eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'time', goalTimeSeconds: 1200,
     targetDate: '2026-11-01', baselineSource: 'known', raceMantra: null, targetSplitSecondsPerKm: null,
   });
   expect(block.id).toBeTruthy();
   expect(block.createdAt).toBeTruthy();
+  expect(block.status).toBe('active');
   expect(await getBlock(block.id)).toEqual(block);
-  expect(await getMostRecentBlock()).toEqual(block);
+});
+
+test('startNewBlock archives whatever was active and makes the new block active', async () => {
+  expect(await getActiveBlock()).toBeUndefined();
+
+  const first = await startNewBlock({
+    eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'time', goalTimeSeconds: 1200,
+    targetDate: '2026-11-01', baselineSource: 'known', raceMantra: null, targetSplitSecondsPerKm: null,
+  });
+  expect(first.status).toBe('active');
+  expect((await getActiveBlock())?.id).toBe(first.id);
+
+  const second = await startNewBlock({
+    eventDistanceMeters: 10000, eventLabel: '10K', goalType: 'time', goalTimeSeconds: 2400,
+    targetDate: '2027-01-01', baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
+  });
+  expect(second.status).toBe('active');
+  expect((await getActiveBlock())?.id).toBe(second.id);
+
+  const archivedFirst = await getBlock(first.id);
+  expect(archivedFirst?.status).toBe('archived');
 });
 
 test('addTimedEffort and listEffortsForBlock sort by date', async () => {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/schema';
 import { seedExampleBlockIfEmpty } from './db/seed';
-import { getMostRecentBlock, getNextUnloggedSession } from './db/repository';
+import { getActiveBlock, getNextUnloggedSession } from './db/repository';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import BlockDashboard from './features/dashboard/BlockDashboard';
 import SessionLogger from './features/logger/SessionLogger';
@@ -16,7 +16,7 @@ export default function App() {
   useEffect(() => {
     (async () => {
       await seedExampleBlockIfEmpty();
-      const block = await getMostRecentBlock();
+      const block = await getActiveBlock();
       if (block) {
         setBlockId(block.id);
         setView({ name: 'dashboard' });
