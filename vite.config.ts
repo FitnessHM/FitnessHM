@@ -3,7 +3,10 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: '/FitnessHM/',
+  // Serve from the domain root. Works on Vercel (fitnesshm.vercel.app) and
+  // local dev alike. The old '/FitnessHM/' value was for GitHub Pages
+  // project-page hosting and 404s every asset when served from root.
+  base: '/',
   plugins: [
     react(),
     VitePWA({
