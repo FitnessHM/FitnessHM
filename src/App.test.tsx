@@ -25,14 +25,26 @@ async function completeOnboarding(user: UserEvent) {
   const getStarted = screen.queryByRole('button', { name: /get started/i });
   if (getStarted) await user.click(getStarted);
 
-  await user.selectOptions(await screen.findByLabelText(/event/i), '5K');
+  await completeOnboardingWithEvent(user, '5K');
+}
+
+// From the discipline step through Finish, targeting a Running event. Shared
+// by the tests that only care about post-setup behavior.
+async function completeOnboardingWithEvent(user: UserEvent, event: string) {
+  await user.click(await screen.findByRole('radio', { name: 'Running' }));
+  await user.click(screen.getByRole('button', { name: /next/i }));
+
+  await user.click(await screen.findByRole('radio', { name: 'Running Intermediate' }));
+  await user.click(screen.getByRole('button', { name: /next/i }));
+
+  await user.selectOptions(await screen.findByLabelText('event'), event);
   await user.selectOptions(screen.getByLabelText(/goal type/i), 'finish');
   await user.click(screen.getByRole('button', { name: /next/i }));
 
   fireEvent.change(screen.getByLabelText(/target date/i), { target: { value: '2027-01-01' } });
   await user.click(screen.getByRole('button', { name: /next/i }));
 
-  await user.selectOptions(screen.getByLabelText(/baseline/i), 'unknown');
+  await user.selectOptions(screen.getByLabelText('baseline'), 'unknown');
   await user.click(screen.getByRole('button', { name: /next/i }));
 
   await user.click(screen.getByRole('button', { name: /finish/i }));
@@ -60,7 +72,7 @@ test('starting a new block from the home screen skips the welcome screen', async
   await user.click(screen.getByRole('button', { name: /start a new block/i }));
 
   // No welcome screen the second time -- straight to the first question.
-  expect(await screen.findByLabelText(/event/i)).toBeInTheDocument();
+  expect(await screen.findByRole('radio', { name: 'Running' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /get started/i })).not.toBeInTheDocument();
   expect(screen.queryByText(/days left/i)).not.toBeInTheDocument();
 });
@@ -77,17 +89,7 @@ test('completing a new block archives the previous active block', async () => {
 
   await user.click(screen.getByRole('button', { name: /start a new block/i }));
 
-  await user.selectOptions(await screen.findByLabelText(/event/i), '10K');
-  await user.selectOptions(screen.getByLabelText(/goal type/i), 'finish');
-  await user.click(screen.getByRole('button', { name: /next/i }));
-
-  fireEvent.change(screen.getByLabelText(/target date/i), { target: { value: '2027-06-01' } });
-  await user.click(screen.getByRole('button', { name: /next/i }));
-
-  await user.selectOptions(screen.getByLabelText(/baseline/i), 'unknown');
-  await user.click(screen.getByRole('button', { name: /next/i }));
-
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await completeOnboardingWithEvent(user, '10K');
 
   expect(await screen.findByText(/10K/)).toBeInTheDocument();
 

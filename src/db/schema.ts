@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import type { Discipline, Level } from '../lib/disciplines';
 
 export type GoalType = 'time' | 'finish' | 'consistency';
 export type OtherTraining = 'lifting' | 'sport' | 'classes' | 'none';
@@ -29,6 +30,22 @@ export interface TrainingBlock {
   targetSplitSecondsPerKm: number | null;
   status: BlockStatus;
   createdAt: string;
+  // Cardio discipline this block's event belongs to. Optional: blocks saved
+  // before disciplines existed have none -- read them as Running (see
+  // lib/disciplines.disciplineConfig).
+  discipline?: Discipline;
+  // Level for `discipline`. For a "Mix" block, every chosen discipline's
+  // level also lives in `disciplineLevels`.
+  level?: Level | null;
+  // Every discipline the athlete wants trained (one entry for a single-choice
+  // block, several for a "Mix" block).
+  disciplines?: Discipline[];
+  disciplineLevels?: Partial<Record<Discipline, Level>>;
+  // Hours per week, set instead of a time goal when the event is "General
+  // fitness" or the discipline is not a race sport (Lifting, Sports).
+  weeklyHours?: number | null;
+  // The specific sports chosen when `discipline` is 'sports'.
+  sports?: string[] | null;
 }
 
 export interface TimedEffort {
@@ -66,6 +83,10 @@ export interface SessionLog {
   rpe: number | null;
   note: string | null;
   cutShortReason: CutShortReason | null;
+  // Which discipline this session was. Optional: unset on logs saved before
+  // multi-discipline support, and on single-discipline blocks it just mirrors
+  // the block's discipline.
+  discipline?: Discipline | null;
 }
 
 export class FitnessHMDatabase extends Dexie {

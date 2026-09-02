@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { PrescribedSession, CutShortReason } from '../../db/schema';
+import { db } from '../../db/schema';
 import { createSessionLog, countCutShortReasons, addTimedEffort } from '../../db/repository';
+import {
+  DEFAULT_DISCIPLINE,
+  DISCIPLINES,
+  disciplineConfig,
+  type Discipline,
+} from '../../lib/disciplines';
 import { todayIso } from '../../lib/dates';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -35,8 +42,19 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
   const [rpe, setRpe] = useState('');
   const [note, setNote] = useState('');
   const [cutShortReason, setCutShortReason] = useState<CutShortReason | ''>('');
+  const [discipline, setDiscipline] = useState<Discipline | ''>('');
 
+  const block = useLiveQuery(() => db.blocks.get(blockId), [blockId]);
   const reasonCounts = useLiveQuery(() => countCutShortReasons(blockId), [blockId]) ?? {};
+
+  // A single-discipline block dictates the discipline; a "Mix" block lets the
+  // athlete pick which one this session was, defaulting to the block's primary.
+  const blockDisciplines = block?.disciplines?.length
+    ? block.disciplines
+    : [block?.discipline ?? DEFAULT_DISCIPLINE];
+  const effectiveDiscipline: Discipline =
+    discipline || block?.discipline || blockDisciplines[0] || DEFAULT_DISCIPLINE;
+  const distanceHint = disciplineConfig(effectiveDiscipline).distanceHint;
 
   const toNumberOrNull = (value: string) => (value.trim() === '' ? null : Number(value));
 
@@ -58,6 +76,7 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
       rpe: toNumberOrNull(rpe),
       note: note.trim() === '' ? null : note,
       cutShortReason: cutShortReason === '' ? null : cutShortReason,
+      discipline: effectiveDiscipline,
     });
 
     // A logged time trial is a real checkpoint measurement -- record it so the
@@ -96,6 +115,20 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
       </Card>
 
       <div className="space-y-4">
+        <label className={LABEL_CLASSES}>
+          Discipline
+          <select
+            aria-label="discipline"
+            value={effectiveDiscipline}
+            onChange={(e) => setDiscipline(e.target.value as Discipline)}
+            className={FIELD_CLASSES}
+          >
+            {blockDisciplines.map((d) => (
+              <option key={d} value={d}>{DISCIPLINES[d].label}</option>
+            ))}
+          </select>
+        </label>
+
         {session?.reps != null && (
           <label className={LABEL_CLASSES}>
             Reps completed
@@ -111,6 +144,9 @@ export default function SessionLogger({ blockId, session, onSaved }: Props) {
         <label className={LABEL_CLASSES}>
           Distance (meters)
           <input aria-label="distance" value={actualDistance} onChange={(e) => setActualDistance(e.target.value)} className={FIELD_CLASSES} />
+          <span className="mt-1 block font-body text-caption normal-case tracking-normal text-secondary">
+            {distanceHint}
+          </span>
         </label>
 
         <details className="group">
