@@ -24,7 +24,7 @@ test('shows the block name, days remaining, and today\'s prescribed session', as
     targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: 1200, note: 'Builds threshold.',
   });
 
-  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} />);
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
 
   expect(await screen.findByText(/5K/)).toBeInTheDocument();
   expect(screen.getAllByText(/days left/i).length).toBeGreaterThan(0);
@@ -38,7 +38,7 @@ test('shows a TBD current best when the block has no efforts yet', async () => {
     targetDate, baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
   });
 
-  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} />);
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
 
   expect(await screen.findByText(/current best: TBD — take your baseline test/i)).toBeInTheDocument();
 });
@@ -50,7 +50,7 @@ test('renders safely when the block has an empty target date', async () => {
   });
   await addTimedEffort({ blockId: block.id, date: '2026-08-01', distanceMeters: 5000, timeSeconds: 1530, kind: 'baseline' });
 
-  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} />);
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
 
   expect(await screen.findByText(/no target date set/i)).toBeInTheDocument();
 });
@@ -63,7 +63,7 @@ test('shows a feasibility warning for an unrealistic goal', async () => {
   });
   await addTimedEffort({ blockId: block.id, date: '2026-08-01', distanceMeters: 5000, timeSeconds: 1530, kind: 'baseline' });
 
-  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} />);
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
 
   await screen.findByText(/5K/);
   expect(screen.getByText(/tight timeline/i)).toBeInTheDocument();
@@ -78,7 +78,7 @@ test('picks the fastest effort as current best, not the most recently logged one
   await addTimedEffort({ blockId: block.id, date: '2026-08-01', distanceMeters: 5000, timeSeconds: 1530, kind: 'baseline' });
   await addTimedEffort({ blockId: block.id, date: '2026-09-01', distanceMeters: 5000, timeSeconds: 1600, kind: 'checkpoint' });
 
-  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} />);
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
 
   // 1530s = 25:30, the faster of the two -- should win over the later 1600s.
   expect(await screen.findByText(/25:30/)).toBeInTheDocument();
@@ -91,7 +91,7 @@ test('shows a rest-day state and an empty recent list when there is nothing logg
     targetDate, baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
   });
 
-  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} />);
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
 
   expect(await screen.findByText(/nothing scheduled today/i)).toBeInTheDocument();
   expect(screen.getByText(/nothing logged yet/i)).toBeInTheDocument();

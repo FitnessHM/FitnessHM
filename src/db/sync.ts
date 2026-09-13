@@ -155,3 +155,27 @@ export function stopSync(): void {
     debounceTimer = null;
   }
 }
+
+/**
+ * Wipes every local table and pushes that empty state to the server
+ * (awaited, not debounced — "Start over" should mean the server is actually
+ * clear by the time this resolves, not "clear in ~2 seconds"). Cancels any
+ * pending debounced push first so a stale one can't race in afterwards and
+ * undo the wipe.
+ */
+export async function startOver(getToken: GetToken): Promise<void> {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  await db.transaction('rw', [db.athlete, db.blocks, db.efforts, db.sessions, db.logs, db.meta], async () => {
+    await db.athlete.clear();
+    await db.blocks.clear();
+    await db.efforts.clear();
+    await db.sessions.clear();
+    await db.logs.clear();
+    await db.meta.put({ id: 1, lastModifiedAt: new Date().toISOString() });
+  });
+  localStorage.removeItem(LAST_SYNCED_KEY);
+  await pushState(getToken);
+}

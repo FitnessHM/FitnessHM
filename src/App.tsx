@@ -4,12 +4,14 @@ import type { PrescribedSession } from './db/schema';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import HomeScreen from './features/home/HomeScreen';
 import SessionLogger from './features/logger/SessionLogger';
+import SettingsScreen from './features/settings/SettingsScreen';
 
 type View =
   | { name: 'loading' }
   | { name: 'onboarding' }
   | { name: 'home' }
-  | { name: 'logger'; session: PrescribedSession | null };
+  | { name: 'logger'; session: PrescribedSession | null }
+  | { name: 'settings' };
 
 export default function App() {
   const [view, setView] = useState<View>({ name: 'loading' });
@@ -53,6 +55,20 @@ export default function App() {
     );
   }
 
+  if (view.name === 'settings') {
+    return (
+      <main className="min-h-screen bg-bg text-primary">
+        <SettingsScreen
+          onBack={() => setView({ name: 'home' })}
+          onStartedOver={() => {
+            setBlockId(null);
+            setView({ name: 'onboarding' });
+          }}
+        />
+      </main>
+    );
+  }
+
   if (blockId) {
     return (
       <main className="min-h-screen bg-bg text-primary">
@@ -60,6 +76,7 @@ export default function App() {
           blockId={blockId}
           onStartNewBlock={() => setView({ name: 'onboarding' })}
           onLogSession={(session) => setView({ name: 'logger', session })}
+          onOpenSettings={() => setView({ name: 'settings' })}
         />
       </main>
     );

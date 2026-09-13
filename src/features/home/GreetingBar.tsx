@@ -1,3 +1,4 @@
+import { Settings } from 'lucide-react';
 import { timeAwareGreeting } from '../../lib/home';
 
 function formatToday(date: Date): string {
@@ -6,13 +7,24 @@ function formatToday(date: Date): string {
 
 interface Props {
   now: Date;
+  onOpenSettings: () => void;
 }
 
-export default function GreetingBar({ now }: Props) {
+export default function GreetingBar({ now, onOpenSettings }: Props) {
   return (
-    <div className="flex items-baseline justify-between">
+    <div className="flex items-center justify-between">
       <h1 className="font-display text-title text-primary">{timeAwareGreeting(now)}</h1>
-      <p className="font-body text-caption text-secondary">{formatToday(now)}</p>
+      <div className="flex items-center gap-3">
+        <p className="font-body text-caption text-secondary">{formatToday(now)}</p>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="settings"
+          className="pressable rounded-control p-1.5 text-secondary hover:text-primary"
+        >
+          <Settings size={20} />
+        </button>
+      </div>
     </div>
   );
 }

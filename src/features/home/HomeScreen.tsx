@@ -18,9 +18,10 @@ interface Props {
   blockId: string;
   onStartNewBlock: () => void;
   onLogSession: (session: PrescribedSession | null) => void;
+  onOpenSettings: () => void;
 }
 
-export default function HomeScreen({ blockId, onStartNewBlock, onLogSession }: Props) {
+export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onOpenSettings }: Props) {
   const block = useLiveQuery(() => db.blocks.get(blockId), [blockId]);
   const efforts = useLiveQuery(() => db.efforts.where('blockId').equals(blockId).sortBy('date'), [blockId]);
   const sessions = useLiveQuery(() => db.sessions.where('blockId').equals(blockId).sortBy('date'), [blockId]);
@@ -79,7 +80,7 @@ export default function HomeScreen({ blockId, onStartNewBlock, onLogSession }: P
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 pb-10">
-      <GreetingBar now={now} />
+      <GreetingBar now={now} onOpenSettings={onOpenSettings} />
 
       <TodayCard session={todaysSession} isLogged={isTodayLogged} onLog={() => onLogSession(todaysSession)} />
 
