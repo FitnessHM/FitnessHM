@@ -1,2 +1,0 @@
-# The backend lives in /server and deploys to Railway, not Vercel.
-server
