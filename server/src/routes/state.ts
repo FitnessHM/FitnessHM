@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { athletes, blocks, efforts, prescribedSessions, sessionLogs } from '../db/schema.js';
+import { athletes, blocks, efforts, prescribedSessions, sessionLogs, users } from '../db/schema.js';
 import { getAuth, requireUser } from '../lib/auth.js';
 import { ensureUser } from '../lib/users.js';
 
@@ -71,6 +71,7 @@ const logSchema = z.object({
   note: z.string().nullable(),
   cutShortReason: z.enum(['heat', 'fatigue', 'pain', 'time', 'life']).nullable(),
   discipline: z.string().nullish(),
+  stravaActivityId: z.number().nullish(),
 });
 
 const statePayloadSchema = z.object({
@@ -81,12 +82,6 @@ const statePayloadSchema = z.object({
   sessions: z.array(sessionSchema),
   logs: z.array(logSchema),
 });
-
-function maxUpdatedAt(rows: { updatedAt: Date }[]): Date {
-  let max = new Date(0);
-  for (const r of rows) if (r.updatedAt > max) max = r.updatedAt;
-  return max;
-}
 
 function omit<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Omit<T, K> {
   const clone = { ...obj };
@@ -112,22 +107,15 @@ stateRouter.get('/api/state', requireUser, async (req, res) => {
     return;
   }
 
-  const [effortRows, sessionRows, logRows] = await Promise.all([
+  const [[user], effortRows, sessionRows, logRows] = await Promise.all([
+    db.select({ stateUpdatedAt: users.stateUpdatedAt }).from(users).where(eq(users.id, userId!)),
     db.select().from(efforts).where(eq(efforts.userId, userId!)),
     db.select().from(prescribedSessions).where(eq(prescribedSessions.userId, userId!)),
     db.select().from(sessionLogs).where(eq(sessionLogs.userId, userId!)),
   ]);
 
-  const updatedAt = maxUpdatedAt([
-    ...(athleteRow ? [athleteRow] : []),
-    ...blockRows,
-    ...effortRows,
-    ...sessionRows,
-    ...logRows,
-  ]);
-
   res.json({
-    updatedAt: updatedAt.toISOString(),
+    updatedAt: user!.stateUpdatedAt.toISOString(),
     athlete: athleteRow ? { id: 1, daysPerWeek: athleteRow.daysPerWeek, otherTraining: athleteRow.otherTraining } : null,
     blocks: blockRows.map((r) => omit(r, ['userId', 'updatedAt'])),
     efforts: effortRows.map((r) => omit(r, ['userId', 'updatedAt'])),
@@ -151,16 +139,17 @@ stateRouter.put('/api/state', requireUser, async (req, res) => {
   const uid = userId!;
   await ensureUser(uid);
 
-  // Whole-payload last-write-wins: reject a push older than what the server
-  // already has, unless the server has nothing yet (first login bootstrap).
-  const [athleteTs] = await db.select({ updatedAt: athletes.updatedAt }).from(athletes).where(eq(athletes.userId, uid));
-  const blockTs = await db.select({ updatedAt: blocks.updatedAt }).from(blocks).where(eq(blocks.userId, uid));
-  const hasExisting = athleteTs != null || blockTs.length > 0;
+  // Whole-payload last-write-wins, gated on a dedicated per-user watermark
+  // (not max(row.updated_at) — that can't detect a deletion, which would let
+  // a stale client push resurrect something a Strava webhook just removed).
+  const [athleteRow] = await db.select({ userId: athletes.userId }).from(athletes).where(eq(athletes.userId, uid));
+  const blockRows = await db.select({ id: blocks.id }).from(blocks).where(eq(blocks.userId, uid));
+  const hasExisting = athleteRow != null || blockRows.length > 0;
 
   if (hasExisting) {
-    const serverUpdatedAt = maxUpdatedAt([...(athleteTs ? [athleteTs] : []), ...blockTs]);
-    if (new Date(payload.updatedAt) < serverUpdatedAt) {
-      res.status(409).json({ error: 'stale', serverUpdatedAt: serverUpdatedAt.toISOString() });
+    const [user] = await db.select({ stateUpdatedAt: users.stateUpdatedAt }).from(users).where(eq(users.id, uid));
+    if (new Date(payload.updatedAt) < user!.stateUpdatedAt) {
+      res.status(409).json({ error: 'stale', serverUpdatedAt: user!.stateUpdatedAt.toISOString() });
       return;
     }
   }
@@ -198,9 +187,12 @@ stateRouter.put('/api/state', requireUser, async (req, res) => {
       await tx.insert(sessionLogs).values(payload.logs.map((l) => ({ ...l, userId: uid })));
     }
 
-    const [newAthleteTs] = await tx.select({ updatedAt: athletes.updatedAt }).from(athletes).where(eq(athletes.userId, uid));
-    const newBlockTs = await tx.select({ updatedAt: blocks.updatedAt }).from(blocks).where(eq(blocks.userId, uid));
-    return maxUpdatedAt([...(newAthleteTs ? [newAthleteTs] : []), ...newBlockTs]);
+    const [updated] = await tx
+      .update(users)
+      .set({ stateUpdatedAt: sql`now()` })
+      .where(eq(users.id, uid))
+      .returning({ stateUpdatedAt: users.stateUpdatedAt });
+    return updated!.stateUpdatedAt;
   });
 
   res.json({ updatedAt: updatedAt.toISOString() });

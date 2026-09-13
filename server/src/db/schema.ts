@@ -35,6 +35,16 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .default(sql`now()`),
+  // Whole-payload sync watermark: bumped on every write to this user's data,
+  // from *any* source (the client's own PUT, or a Strava webhook writing
+  // sessionLogs independently of the client). Deliberately not derived from
+  // max(row.updated_at) across tables — that can't detect a deletion (the
+  // max just stops including the deleted row, so it can go stale instead of
+  // forward), which would let an in-flight client push silently resurrect
+  // something a webhook just deleted.
+  stateUpdatedAt: timestamp('state_updated_at', { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
   updatedAt,
 });
 
@@ -140,6 +150,12 @@ export const sessionLogs = pgTable(
     note: text('note'),
     cutShortReason: text('cut_short_reason'),
     discipline: text('discipline'),
+    // Strava's activity id when this log was created from a synced activity
+    // (backfill or webhook) — null for manually-logged sessions. Globally
+    // unique (Strava ids are unique across all athletes), so a webhook
+    // "update" or "delete" event can find the right row without a lookup
+    // table, and backfill can't double-import the same activity.
+    stravaActivityId: bigint('strava_activity_id', { mode: 'number' }).unique(),
     updatedAt,
   },
   (t) => [index('session_logs_block_date_idx').on(t.blockId, t.date)],
@@ -149,7 +165,7 @@ export const stravaAccounts = pgTable('strava_accounts', {
   userId: text('user_id')
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  stravaAthleteId: bigint('strava_athlete_id', { mode: 'number' }).notNull(),
+  stravaAthleteId: bigint('strava_athlete_id', { mode: 'number' }).notNull().unique(),
   // AES-256-GCM ciphertext, base64. Never plaintext.
   accessTokenEncrypted: text('access_token_encrypted').notNull(),
   refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),

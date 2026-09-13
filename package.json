@@ -14,7 +14,7 @@
     "test": "vitest run",
     "typecheck": "tsc -b",
     "typecheck:api": "tsc -p server/tsconfig.json",
-    "db:generate": "drizzle-kit generate --config server/drizzle.config.ts",
+    "db:generate": "cd server && drizzle-kit generate",
     "db:migrate": "tsx server/src/db/migrate.ts"
   },
   "dependencies": {

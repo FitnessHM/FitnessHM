@@ -87,6 +87,10 @@ export interface SessionLog {
   // multi-discipline support, and on single-discipline blocks it just mirrors
   // the block's discipline.
   discipline?: Discipline | null;
+  // Set when this log came from a synced Strava activity (backfill or
+  // webhook), never set by the app itself. Lets the UI mark it as
+  // Strava-sourced without a separate lookup.
+  stravaActivityId?: number | null;
 }
 
 // Singleton row tracking when local data last changed. Bumped by every

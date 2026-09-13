@@ -13,20 +13,34 @@ type View =
   | { name: 'logger'; session: PrescribedSession | null }
   | { name: 'settings' };
 
+type StravaNotice = 'connected' | 'denied' | 'error' | null;
+
+function readStravaNotice(): StravaNotice {
+  const value = new URLSearchParams(window.location.search).get('strava');
+  if (value === 'connected' || value === 'denied' || value === 'error') return value;
+  return null;
+}
+
 export default function App() {
   const [view, setView] = useState<View>({ name: 'loading' });
   const [blockId, setBlockId] = useState<string | null>(null);
+  const [stravaNotice] = useState<StravaNotice>(readStravaNotice);
 
   useEffect(() => {
     (async () => {
       const block = await getActiveBlock();
-      if (block) {
-        setBlockId(block.id);
-        setView({ name: 'home' });
-      } else {
-        setView({ name: 'onboarding' });
+      if (block) setBlockId(block.id);
+
+      if (stravaNotice) {
+        // Strip the query param so a refresh doesn't re-show the notice.
+        window.history.replaceState(null, '', window.location.pathname);
+        setView({ name: 'settings' });
+        return;
       }
+
+      setView(block ? { name: 'home' } : { name: 'onboarding' });
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (view.name === 'loading') {
@@ -59,7 +73,8 @@ export default function App() {
     return (
       <main className="min-h-screen bg-bg text-primary">
         <SettingsScreen
-          onBack={() => setView({ name: 'home' })}
+          stravaNotice={stravaNotice}
+          onBack={() => setView(blockId ? { name: 'home' } : { name: 'onboarding' })}
           onStartedOver={() => {
             setBlockId(null);
             setView({ name: 'onboarding' });

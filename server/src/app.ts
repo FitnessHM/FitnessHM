@@ -6,6 +6,7 @@ import { pingDb } from './db/index.js';
 import { allowedOrigins, env } from './env.js';
 import { getAuth, requireUser, withClerkAuth } from './lib/auth.js';
 import { stateRouter } from './routes/state.js';
+import { stravaRouter } from './routes/strava.js';
 
 export function createApp() {
   const app = express();
@@ -61,6 +62,7 @@ export function createApp() {
   });
 
   app.use(stateRouter);
+  app.use(stravaRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'not_found' });

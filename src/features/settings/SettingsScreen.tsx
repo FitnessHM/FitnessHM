@@ -4,13 +4,15 @@ import { ChevronLeft } from 'lucide-react';
 import { startOver } from '../../db/sync';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import StravaSection from './StravaSection';
 
 interface Props {
   onBack: () => void;
   onStartedOver: () => void;
+  stravaNotice: 'connected' | 'denied' | 'error' | null;
 }
 
-export default function SettingsScreen({ onBack, onStartedOver }: Props) {
+export default function SettingsScreen({ onBack, onStartedOver, stravaNotice }: Props) {
   const { getToken } = useAuth();
   const [confirming, setConfirming] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -35,6 +37,8 @@ export default function SettingsScreen({ onBack, onStartedOver }: Props) {
         </button>
         <h1 className="font-display text-title text-primary">Settings</h1>
       </div>
+
+      <StravaSection notice={stravaNotice} />
 
       <Card className="space-y-3">
         <h2 className="font-body text-body font-bold text-primary">Start over</h2>
