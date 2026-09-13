@@ -53,6 +53,7 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
   const [daysPerWeek, setDaysPerWeek] = useState(3);
   const [otherTraining, setOtherTraining] = useState<OtherTraining[]>([]);
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedDisciplines: Discipline[] =
     interest === 'mix' ? mixDisciplines : interest ? [interest] : [];
@@ -128,6 +129,12 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
   };
 
   const handleFinish = async () => {
+    // Guards against a double-click (or a slow render re-firing the handler)
+    // creating two blocks — startNewBlock alone only guarantees one *active*
+    // block, not that a second call can't run at all.
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const primaryDiscipline = eventListDiscipline;
     const cfg = disciplineConfig(primaryDiscipline);
     const chosenEvent = cfg.events.find((e) => e.label === eventLabel);
@@ -182,6 +189,13 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
     }
 
     onComplete(block.id);
+  };
+
+  const onFinishClick = () => {
+    handleFinish().catch((err) => {
+      console.error('onboarding finish failed', err);
+      setIsSubmitting(false);
+    });
   };
 
   if (step === 0) {
@@ -460,7 +474,7 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
               ))}
             </div>
           </div>
-          <Button onClick={handleFinish} className="w-full">Finish</Button>
+          <Button onClick={onFinishClick} disabled={isSubmitting} className="w-full">Finish</Button>
         </Card>
       )}
     </div>

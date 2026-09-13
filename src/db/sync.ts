@@ -48,7 +48,10 @@ async function exportLocalState(): Promise<StatePayload> {
 
 // Replaces every local table wholesale with the server's snapshot. Meta is
 // stamped from the payload itself (not "now"), so a later local edit is
-// still correctly seen as newer than what we just imported.
+// still correctly seen as newer than what we just imported. This write to
+// db.meta must not itself trigger the debounced-push hook (see
+// suppressNextHook below) — otherwise every pull immediately re-pushes the
+// exact data it just received.
 async function importRemoteState(state: StatePayload): Promise<void> {
   await db.transaction('rw', [db.athlete, db.blocks, db.efforts, db.sessions, db.logs, db.meta], async () => {
     await db.athlete.clear();
@@ -61,6 +64,7 @@ async function importRemoteState(state: StatePayload): Promise<void> {
     await db.sessions.bulkPut(state.sessions);
     await db.logs.clear();
     await db.logs.bulkPut(state.logs);
+    suppressNextHook = true;
     await db.meta.put({ id: 1, lastModifiedAt: state.updatedAt });
   });
   localStorage.setItem(LAST_SYNCED_KEY, state.updatedAt);
@@ -116,8 +120,13 @@ export async function runInitialSync(getToken: GetToken): Promise<void> {
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let tokenGetter: GetToken | null = null;
+let suppressNextHook = false;
 
 function scheduleDebouncedPush(): void {
+  if (suppressNextHook) {
+    suppressNextHook = false;
+    return;
+  }
   if (!tokenGetter) return;
   if (debounceTimer) clearTimeout(debounceTimer);
   const getToken = tokenGetter;

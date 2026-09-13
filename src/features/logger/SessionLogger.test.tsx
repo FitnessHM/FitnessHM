@@ -1,6 +1,6 @@
 // src/features/logger/SessionLogger.test.tsx
 import 'fake-indexeddb/auto';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { db } from '../../db/schema';
@@ -30,6 +30,7 @@ test('logging a partial completion saves actuals with no error styling', async (
   fireEvent.change(screen.getByLabelText(/reps completed/i), { target: { value: '3.5' } });
   await user.selectOptions(screen.getByLabelText(/cut short reason/i), 'fatigue');
   await user.click(screen.getByRole('button', { name: /save/i }));
+  await waitFor(() => expect(onSaved).toHaveBeenCalled());
 
   const logs = await db.logs.where('blockId').equals(block.id).toArray();
   expect(logs).toHaveLength(1);
@@ -59,6 +60,7 @@ test('logging a time trial with distance and duration records a checkpoint effor
   fireEvent.change(screen.getByLabelText(/duration/i), { target: { value: '1470' } });
   fireEvent.change(screen.getByLabelText(/distance/i), { target: { value: '5000' } });
   await user.click(screen.getByRole('button', { name: /save/i }));
+  await waitFor(() => expect(onSaved).toHaveBeenCalled());
 
   const efforts = await db.efforts.where('blockId').equals(block.id).toArray();
   expect(efforts).toHaveLength(1);
@@ -99,6 +101,7 @@ test('adhoc logging works with no prescribed session', async () => {
 
   fireEvent.change(screen.getByLabelText(/duration/i), { target: { value: '1800' } });
   await user.click(screen.getByRole('button', { name: /save/i }));
+  await waitFor(() => expect(onSaved).toHaveBeenCalled());
 
   const logs = await db.logs.where('blockId').equals(block.id).toArray();
   expect(logs).toHaveLength(1);

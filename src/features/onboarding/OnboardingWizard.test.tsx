@@ -1,6 +1,6 @@
 // src/features/onboarding/OnboardingWizard.test.tsx
 import 'fake-indexeddb/auto';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { db } from '../../db/schema';
@@ -17,6 +17,17 @@ async function pickDisciplineAndLevel(user: UserEvent, discipline = 'Running', l
   await user.click(screen.getByRole('button', { name: /next/i }));
   await user.click(await screen.findByRole('radio', { name: `${discipline} ${level}` }));
   await user.click(screen.getByRole('button', { name: /next/i }));
+}
+
+// handleFinish does several sequential Dexie writes (saveAthlete,
+// startNewBlock, then an effort or session) before calling onComplete.
+// user.click() only awaits event dispatch, not that chain, so every test
+// below waits for its actual completion instead of assuming it's done.
+async function clickFinishAndWait(user: UserEvent) {
+  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await waitFor(async () => {
+    expect(await db.blocks.count()).toBeGreaterThan(0);
+  });
 }
 
 test('completing the wizard with a known baseline creates athlete, block, and effort', async () => {
@@ -44,7 +55,7 @@ test('completing the wizard with a known baseline creates athlete, block, and ef
   // Step 6: days per week + other training
   fireEvent.change(screen.getByLabelText(/days per week/i), { target: { value: '4' } });
   await user.click(screen.getByLabelText('lifting'));
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await clickFinishAndWait(user);
 
   const blocks = await db.blocks.toArray();
   expect(blocks).toHaveLength(1);
@@ -81,7 +92,7 @@ test('choosing "no idea" baseline creates a week-1 time trial instead of an effo
   await user.selectOptions(screen.getByLabelText('baseline'), 'unknown');
   await user.click(screen.getByRole('button', { name: /next/i }));
 
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await clickFinishAndWait(user);
 
   const blocks = await db.blocks.toArray();
   const sessions = await db.sessions.where('blockId').equals(blocks[0].id).toArray();
@@ -108,7 +119,7 @@ test('a cycling "General fitness" goal stores a weekly hour budget and skips the
   expect(screen.queryByLabelText('baseline')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /next/i }));
 
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await clickFinishAndWait(user);
 
   const blocks = await db.blocks.toArray();
   expect(blocks[0].discipline).toBe('cycling');
@@ -147,7 +158,7 @@ test('a "Mix" choice asks for a level per selected discipline and stores them al
 
   await user.selectOptions(screen.getByLabelText('baseline'), 'unknown');
   await user.click(screen.getByRole('button', { name: /next/i }));
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await clickFinishAndWait(user);
 
   const blocks = await db.blocks.toArray();
   expect(blocks[0].discipline).toBe('swimming');
@@ -173,7 +184,7 @@ test('a Lifting interest skips the event list and baseline, storing a weekly bud
 
   expect(screen.queryByLabelText('baseline')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /next/i }));
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await clickFinishAndWait(user);
 
   const blocks = await db.blocks.toArray();
   expect(blocks[0].discipline).toBe('lifting');
@@ -207,7 +218,7 @@ test('a Sports interest asks which sports and stores the selected ones', async (
   fireEvent.change(screen.getByLabelText(/target date/i), { target: { value: '2026-12-01' } });
   await user.click(screen.getByRole('button', { name: /next/i }));
   await user.click(screen.getByRole('button', { name: /next/i }));
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await clickFinishAndWait(user);
 
   const blocks = await db.blocks.toArray();
   expect(blocks[0].discipline).toBe('sports');
