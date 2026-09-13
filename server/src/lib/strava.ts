@@ -37,7 +37,7 @@ interface TokenResponse {
   access_token: string;
   refresh_token: string;
   expires_at: number; // unix seconds
-  athlete?: { id: number };
+  athlete?: { id: number; firstname?: string; profile?: string; profile_medium?: string };
 }
 
 async function postToken(body: Record<string, string>): Promise<TokenResponse> {
@@ -65,6 +65,8 @@ async function refreshToken(refreshTokenValue: string): Promise<TokenResponse> {
 export async function saveTokens(userId: string, token: TokenResponse): Promise<void> {
   if (!db) throw new Error('DATABASE_URL is not set');
   if (!token.athlete) throw new Error('Strava token response missing athlete id');
+  const athleteFirstName = token.athlete.firstname ?? null;
+  const athleteAvatarUrl = token.athlete.profile ?? token.athlete.profile_medium ?? null;
   await db
     .insert(stravaAccounts)
     .values({
@@ -74,6 +76,8 @@ export async function saveTokens(userId: string, token: TokenResponse): Promise<
       refreshTokenEncrypted: encryptSecret(token.refresh_token),
       expiresAt: new Date(token.expires_at * 1000),
       scope: env.STRAVA_SCOPE,
+      athleteFirstName,
+      athleteAvatarUrl,
     })
     .onConflictDoUpdate({
       target: stravaAccounts.userId,
@@ -83,6 +87,8 @@ export async function saveTokens(userId: string, token: TokenResponse): Promise<
         refreshTokenEncrypted: encryptSecret(token.refresh_token),
         expiresAt: new Date(token.expires_at * 1000),
         scope: env.STRAVA_SCOPE,
+        athleteFirstName,
+        athleteAvatarUrl,
         updatedAt: sql`now()`,
       },
     });
@@ -269,8 +275,9 @@ export async function disconnectAccount(userId: string): Promise<void> {
   await bumpWatermark(userId);
 }
 
-/** Backfills recent activities on connect. Best-effort per activity. */
+/** Backfills recent activities (also used by "Sync now"). Best-effort per activity. */
 export async function backfillRecentActivities(userId: string, accessToken: string, days = 30): Promise<void> {
+  if (!db) throw new Error('DATABASE_URL is not set');
   const after = Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
   const activities = await fetchActivities(accessToken, after, 50);
   for (const activity of activities) {
@@ -280,4 +287,33 @@ export async function backfillRecentActivities(userId: string, accessToken: stri
       console.error(`Strava backfill: failed to import activity ${activity.id}`, err);
     }
   }
+  await db.update(stravaAccounts).set({ lastSyncedAt: sql`now()` }).where(eq(stravaAccounts.userId, userId));
+}
+
+export interface ConnectionStatus {
+  connected: boolean;
+  athleteFirstName: string | null;
+  athleteAvatarUrl: string | null;
+  lastSyncedAt: string | null;
+  activityCount: number;
+}
+
+export async function getConnectionStatus(userId: string): Promise<ConnectionStatus> {
+  if (!db) throw new Error('DATABASE_URL is not set');
+  const [account] = await db.select().from(stravaAccounts).where(eq(stravaAccounts.userId, userId));
+  if (!account) {
+    return { connected: false, athleteFirstName: null, athleteAvatarUrl: null, lastSyncedAt: null, activityCount: 0 };
+  }
+  const countRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(sessionLogs)
+    .where(and(eq(sessionLogs.userId, userId), sql`${sessionLogs.stravaActivityId} is not null`));
+  const count = countRows[0]?.count ?? 0;
+  return {
+    connected: true,
+    athleteFirstName: account.athleteFirstName,
+    athleteAvatarUrl: account.athleteAvatarUrl,
+    lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null,
+    activityCount: count,
+  };
 }

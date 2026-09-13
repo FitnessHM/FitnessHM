@@ -171,5 +171,13 @@ export const stravaAccounts = pgTable('strava_accounts', {
   refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   scope: text('scope'),
+  // Both come free in the OAuth token response's athlete summary — no extra
+  // API call needed. Shown in Settings so "connected" means something
+  // concrete, not just a boolean.
+  athleteFirstName: text('athlete_first_name'),
+  athleteAvatarUrl: text('athlete_avatar_url'),
+  // Set after backfill or a manual "Sync now"; NOT bumped by the webhook
+  // (that's Strava telling us about ITS state changing, not us pulling).
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   updatedAt,
 });

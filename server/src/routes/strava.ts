@@ -11,6 +11,7 @@ import {
   exchangeCodeForToken,
   fetchActivity,
   findUserByStravaAthleteId,
+  getConnectionStatus,
   getValidAccessToken,
   saveTokens,
   upsertActivityLog,
@@ -38,8 +39,20 @@ export const stravaRouter = Router();
 
 stravaRouter.get('/api/strava/status', requireUser, async (req, res) => {
   const { userId } = getAuth(req);
-  const token = await getValidAccessToken(userId!).catch(() => null);
-  res.json({ connected: token !== null });
+  const status = await getConnectionStatus(userId!);
+  res.json(status);
+});
+
+stravaRouter.post('/api/strava/sync', requireUser, async (req, res) => {
+  const { userId } = getAuth(req);
+  const accessToken = await getValidAccessToken(userId!);
+  if (!accessToken) {
+    res.status(409).json({ error: 'not_connected' });
+    return;
+  }
+  await backfillRecentActivities(userId!, accessToken);
+  const status = await getConnectionStatus(userId!);
+  res.json(status);
 });
 
 stravaRouter.get('/api/strava/connect', requireUser, (_req, res) => {
