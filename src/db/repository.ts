@@ -4,13 +4,23 @@ import type {
 } from './schema';
 import { todayIso } from '../lib/dates';
 
+// Bumps db.meta inside the caller's transaction. db/sync.ts hooks this table
+// to trigger a debounced push, so every mutator below runs it in the same
+// transaction as its actual write.
+async function touchMeta(): Promise<void> {
+  await db.meta.put({ id: 1, lastModifiedAt: new Date().toISOString() });
+}
+
 export async function getAthlete(): Promise<Athlete | undefined> {
   return db.athlete.get(1);
 }
 
 export async function saveAthlete(daysPerWeek: number, otherTraining: OtherTraining[]): Promise<Athlete> {
   const athlete: Athlete = { id: 1, daysPerWeek, otherTraining };
-  await db.athlete.put(athlete);
+  await db.transaction('rw', db.athlete, db.meta, async () => {
+    await db.athlete.put(athlete);
+    await touchMeta();
+  });
   return athlete;
 }
 
@@ -18,7 +28,10 @@ export async function createBlock(
   input: Omit<TrainingBlock, 'id' | 'createdAt' | 'status'>
 ): Promise<TrainingBlock> {
   const block: TrainingBlock = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString(), status: 'active' };
-  await db.blocks.add(block);
+  await db.transaction('rw', db.blocks, db.meta, async () => {
+    await db.blocks.add(block);
+    await touchMeta();
+  });
   return block;
 }
 
@@ -38,7 +51,7 @@ export async function getActiveBlock(): Promise<TrainingBlock | undefined> {
 export async function startNewBlock(
   input: Omit<TrainingBlock, 'id' | 'createdAt' | 'status'>
 ): Promise<TrainingBlock> {
-  return db.transaction('rw', db.blocks, async () => {
+  return db.transaction('rw', db.blocks, db.meta, async () => {
     const current = await getActiveBlock();
     if (current) {
       await db.blocks.update(current.id, { status: 'archived' });
@@ -49,7 +62,10 @@ export async function startNewBlock(
 
 export async function addTimedEffort(input: Omit<TimedEffort, 'id'>): Promise<TimedEffort> {
   const effort: TimedEffort = { ...input, id: crypto.randomUUID() };
-  await db.efforts.add(effort);
+  await db.transaction('rw', db.efforts, db.meta, async () => {
+    await db.efforts.add(effort);
+    await touchMeta();
+  });
   return effort;
 }
 
@@ -59,7 +75,10 @@ export async function listEffortsForBlock(blockId: string): Promise<TimedEffort[
 
 export async function createPrescribedSession(input: Omit<PrescribedSession, 'id'>): Promise<PrescribedSession> {
   const session: PrescribedSession = { ...input, id: crypto.randomUUID() };
-  await db.sessions.add(session);
+  await db.transaction('rw', db.sessions, db.meta, async () => {
+    await db.sessions.add(session);
+    await touchMeta();
+  });
   return session;
 }
 
@@ -77,7 +96,10 @@ export async function getNextUnloggedSession(blockId: string): Promise<Prescribe
 
 export async function createSessionLog(input: Omit<SessionLog, 'id'>): Promise<SessionLog> {
   const log: SessionLog = { ...input, id: crypto.randomUUID() };
-  await db.logs.add(log);
+  await db.transaction('rw', db.logs, db.meta, async () => {
+    await db.logs.add(log);
+    await touchMeta();
+  });
   return log;
 }
 

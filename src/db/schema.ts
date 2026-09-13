@@ -89,12 +89,22 @@ export interface SessionLog {
   discipline?: Discipline | null;
 }
 
+// Singleton row tracking when local data last changed. Bumped by every
+// repository.ts mutator; watched by db/sync.ts to trigger a debounced push.
+// Deliberately not on individual rows (see the sync plan) — step 3 syncs
+// the whole payload at once, keyed by this one timestamp.
+export interface SyncMeta {
+  id: 1;
+  lastModifiedAt: string;
+}
+
 export class FitnessHMDatabase extends Dexie {
   athlete!: Table<Athlete, number>;
   blocks!: Table<TrainingBlock, string>;
   efforts!: Table<TimedEffort, string>;
   sessions!: Table<PrescribedSession, string>;
   logs!: Table<SessionLog, string>;
+  meta!: Table<SyncMeta, number>;
 
   constructor() {
     super('fitnesshm');
@@ -120,6 +130,17 @@ export class FitnessHMDatabase extends Dexie {
       tx.table('blocks').toCollection().modify((block) => {
         block.status = 'active';
       })
+    );
+    // v3 adds the sync-meta table (step 3: server sync).
+    this.version(3).stores({
+      athlete: 'id',
+      blocks: 'id, targetDate, createdAt, status',
+      efforts: 'id, blockId, date, [blockId+date]',
+      sessions: 'id, blockId, date, [blockId+date]',
+      logs: 'id, blockId, sessionId, date, [blockId+date]',
+      meta: 'id',
+    }).upgrade((tx) =>
+      tx.table('meta').put({ id: 1, lastModifiedAt: new Date().toISOString() })
     );
   }
 }

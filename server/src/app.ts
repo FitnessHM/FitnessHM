@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { pingDb } from './db/index.js';
 import { allowedOrigins, env } from './env.js';
 import { getAuth, requireUser, withClerkAuth } from './lib/auth.js';
+import { stateRouter } from './routes/state.js';
 
 export function createApp() {
   const app = express();
@@ -53,11 +54,13 @@ export function createApp() {
   });
 
   // Step 2 sanity check: confirms the client -> Clerk -> requireUser chain
-  // works end to end. Step 3 adds the real GET/PUT /api/state here.
+  // works end to end.
   app.get('/api/me', requireUser, (req, res) => {
     const { userId } = getAuth(req);
     res.json({ userId });
   });
+
+  app.use(stateRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'not_found' });

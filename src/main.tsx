@@ -2,6 +2,7 @@ import { ClerkProvider, SignedIn, SignedOut, SignIn, UserButton } from '@clerk/c
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import SyncGate from './SyncGate';
 import './index.css';
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -18,10 +19,12 @@ createRoot(document.getElementById('root')!).render(
         </main>
       </SignedOut>
       <SignedIn>
-        <div className="fixed top-3 right-3 z-50">
-          <UserButton afterSignOutUrl="/" />
-        </div>
-        <App />
+        <SyncGate>
+          <div className="fixed top-3 right-3 z-50">
+            <UserButton afterSignOutUrl="/" />
+          </div>
+          <App />
+        </SyncGate>
       </SignedIn>
     </ClerkProvider>
   </StrictMode>,

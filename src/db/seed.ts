@@ -8,7 +8,7 @@ export async function seedExampleBlockIfEmpty(): Promise<void> {
   // One transaction so the count check and the inserts are atomic: React
   // StrictMode's double-invoked effect (and two open tabs) would otherwise
   // both see an empty table and each seed a block.
-  await db.transaction('rw', db.blocks, db.efforts, db.sessions, async () => {
+  await db.transaction('rw', db.blocks, db.efforts, db.sessions, db.meta, async () => {
     const blockCount = await db.blocks.count();
     if (blockCount > 0) return;
 

@@ -1,24 +1,32 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { neonConfig, Pool } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 import { env } from '../env.js';
 import * as schema from './schema.js';
 
-// Neon's HTTP driver: each query is a stateless HTTPS call, no pooled TCP
-// connection held across invocations. That's the right model for serverless
-// (a pg.Pool per invocation would risk exhausting Postgres's connection
-// limit under concurrency). db.transaction() batches statements into one
-// HTTP call executed atomically server-side — not a fully interactive
-// transaction, but enough for whole-payload sync writes.
-const sql = env.DATABASE_URL ? neon(env.DATABASE_URL) : null;
+// neon-http's driver has no transaction support at all ("No transactions
+// support in neon-http driver") — confirmed the hard way while building the
+// whole-payload state sync, which needs an atomic delete+reinsert. This
+// WebSocket-backed Pool gives real transactions while still being fine for
+// serverless: Neon's pooling handles the connection lifecycle, no long-lived
+// TCP pool held across invocations the way raw `pg` would.
+neonConfig.webSocketConstructor = ws;
 
-export const db = sql ? drizzle(sql, { schema }) : null;
+export const pool = env.DATABASE_URL ? new Pool({ connectionString: env.DATABASE_URL }) : null;
+
+export const db = pool ? drizzle(pool, { schema }) : null;
 
 /** True when `select 1` round-trips. Used by /api/readyz. */
 export async function pingDb(): Promise<boolean> {
-  if (!sql) return false;
+  if (!pool) return false;
   try {
-    await sql`select 1`;
-    return true;
+    const client = await pool.connect();
+    try {
+      await client.query('select 1');
+      return true;
+    } finally {
+      client.release();
+    }
   } catch {
     return false;
   }
