@@ -63,6 +63,16 @@ export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onO
       ? (baselineEquivalentSeconds - currentBestEquivalentSeconds) / (baselineEquivalentSeconds - block.goalTimeSeconds)
       : 0;
 
+  // `sessions.length === 0` used to be the only check here, which missed a
+  // real case: a block synced in from before the plan generator existed
+  // carries exactly one hand-seeded `time_trial` session (phase 1's old
+  // onboarding), so `length` is 1, not 0 -- Build my plan never showed, and
+  // the one stub session (dated a week after a long-past createdAt) just
+  // sat there reading as "nothing scheduled," forever. A real generated
+  // plan always has `source: 'generated'` sessions; a legacy stub never
+  // does (the field didn't exist yet) -- check for that instead of a count.
+  const hasGeneratedPlan = sessions.some((s) => s.source === 'generated');
+
   const todaysSession = sessions.find((s) => s.date === today) ?? null;
   const loggedSessionIds = new Set(logs.map((l) => l.sessionId).filter((id): id is string => id !== null));
   const isTodayLogged = todaysSession
@@ -84,7 +94,7 @@ export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onO
     <div className="mx-auto max-w-2xl space-y-5 p-4 pb-10">
       <GreetingBar now={now} onOpenSettings={onOpenSettings} />
 
-      {sessions.length === 0 ? (
+      {!hasGeneratedPlan ? (
         <BuildPlanCard
           block={block}
           athlete={athlete}

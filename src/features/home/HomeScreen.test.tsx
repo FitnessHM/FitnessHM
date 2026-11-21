@@ -22,6 +22,7 @@ test('shows the block name, days remaining, and today\'s prescribed session', as
   await createPrescribedSession({
     blockId: block.id, date: isoDateLocal(new Date()), type: 'tempo', reps: null,
     targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: 1200, note: 'Builds threshold.',
+    source: 'generated', edited: false,
   });
 
   render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
@@ -90,12 +91,13 @@ test('shows a rest-day state and an empty recent list when there is nothing logg
     eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'finish', goalTimeSeconds: null,
     targetDate, baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
   });
-  // A plan with a real (non-today) session exists -- otherwise zero
-  // sessions reads as "no plan generated yet" (see the "Build my plan" test
-  // below), not "rest day."
+  // A real generated (non-today) session exists -- otherwise this reads as
+  // "no plan generated yet" (see the "Build my plan" tests below), not
+  // "rest day."
   await createPrescribedSession({
     blockId: block.id, date: isoDateLocal(new Date(Date.now() + 86400000)), type: 'easy', reps: null,
     targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: 1800, note: null,
+    source: 'generated', edited: false,
   });
 
   render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
@@ -116,4 +118,27 @@ test('shows a "Build my plan" card instead of today\'s session when the block ha
   expect(await screen.findByText(/no plan yet/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /build my plan/i })).toBeInTheDocument();
   expect(screen.queryByText(/nothing scheduled today/i)).not.toBeInTheDocument();
+});
+
+test('shows "Build my plan" for a pre-generator block too, even though it has one legacy session', async () => {
+  // Reproduces a real account's state: a block synced in from before the
+  // plan generator existed, carrying phase 1's old hand-seeded time_trial
+  // (no `source` field -- it predates that column). `sessions.length` is 1
+  // here, not 0 -- the bug was keying the Build-my-plan check off a plain
+  // count instead of "does a real generated plan exist."
+  const targetDate = isoDateLocal(new Date(Date.now() + 42 * 86400000));
+  const block = await createBlock({
+    eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'finish', goalTimeSeconds: null,
+    targetDate, baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
+  });
+  await createPrescribedSession({
+    blockId: block.id, date: isoDateLocal(new Date(Date.now() + 7 * 86400000)), type: 'time_trial', reps: null,
+    targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: null,
+    note: 'A baseline test tells us where you are really starting from.',
+  });
+
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
+
+  expect(await screen.findByText(/no plan yet/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /build my plan/i })).toBeInTheDocument();
 });
