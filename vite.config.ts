@@ -7,6 +7,17 @@ export default defineConfig({
   // local dev alike. The old '/FitnessHM/' value was for GitHub Pages
   // project-page hosting and 404s every asset when served from root.
   base: '/',
+  server: {
+    // Forwards /api/* to the local Express server (`npm run dev:api`) so
+    // the browser sees one origin, same as production/`vercel dev` --
+    // this block only affects `vite dev`, never `vite build`/`preview`.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
