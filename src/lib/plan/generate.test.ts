@@ -191,3 +191,18 @@ test('returns nothing for a Lifting-only block -- lifting is not a cardio discip
 test('returns nothing when the target date has already passed', () => {
   expect(generatePlan(input({ today: '2026-06-01', block: block({ targetDate: '2026-01-01' }) }))).toEqual([]);
 });
+
+// Regression: this exact range (today before, targetDate after Nov 1,
+// 2026 -- the fall-back DST transition in America/New_York) used to hang
+// generatePlan forever (see dateUtils.test.ts for the root cause in
+// addDaysIso). Confirmed in a real browser, not just a theory: the
+// design-pass screenshot harness seeded a block seven weeks out and the
+// page froze solid. Vitest's own per-test timeout is the safety net here
+// if this regresses -- a clean test failure, not a hung CI run.
+test('terminates for a block whose date range crosses a DST transition', () => {
+  const drafts = generatePlan(
+    input({ today: '2026-10-20', block: block({ targetDate: '2026-12-15' }) })
+  );
+  expect(drafts.length).toBeGreaterThan(0);
+  expect(drafts.every((s) => s.date >= '2026-10-20' && s.date <= '2026-12-15')).toBe(true);
+});
