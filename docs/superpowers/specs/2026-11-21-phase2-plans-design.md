@@ -367,6 +367,13 @@ interface GeneratorInput {
   block: TrainingBlock;                       // discipline(s), level(s), event/goal or weeklyHours, targetDate, baselineSource
   athlete: Athlete;                           // trainingWeekdays, otherTrainingWeekdays
   baselines: Partial<Record<Discipline, TimedEffort>>; // most recent/best effort per discipline, if any
+  // Sessions the generator must treat as fixed: dated >= today, and either
+  // edited: true or source: 'user'. Empty on a brand-new plan. On "Update
+  // plan" this is every such session in the block — the generator counts
+  // each one's duration/distance toward its week's volume and its
+  // intensity toward that week's hard/moderate-session count, and never
+  // places a new session on a date one of them occupies.
+  fixedSessions: PrescribedSession[];
 }
 ```
 
@@ -543,6 +550,17 @@ from a new button on `HomeScreen`'s `GoalStrip`.
   user-edited session's date, that session is deleted (it would be
   scheduled after the event) and called out by name in the summary, not
   silently dropped.
+
+  Kept edited/user sessions are **fixed inputs to the regeneration**, not
+  just rows the diff happens to leave alone: `schedule.ts` takes them as
+  part of its input, counts their duration/distance toward that week's
+  volume and their `intensity` toward that week's hard/moderate-session
+  count (so a kept hard session really does occupy one of that week's 1–2
+  hard-session slots), and never places a newly-generated session on a date
+  one of them already occupies. This applies on every call to the
+  generator, not only "Update plan" — a freshly-generated plan has no
+  edited sessions yet, but the same function signature and the same rule
+  apply uniformly rather than "Update plan" being special-cased.
 
 ## Matching logs to planned sessions
 
