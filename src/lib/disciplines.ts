@@ -26,6 +26,14 @@ export interface DisciplineConfig {
   // false == not a race sport: onboarding skips the event list and the
   // baseline test and just asks for a weekly time budget.
   raceable: boolean;
+  // true == the plan generator has a session library for this discipline
+  // and it can join a "Mix" block. Distinct from `raceable` -- walking is
+  // cardio (generator-eligible, Mix-eligible) but not raceable (no event
+  // list, always the weekly-budget onboarding path, same as General
+  // fitness). Lifting and Sports are neither: "other training" the
+  // scheduler avoids stacking hard cardio on top of, never something the
+  // generator prescribes sessions for.
+  cardio: boolean;
   // Shown under the Distance field on the Log-a-session screen. Storage is
   // always meters; this only tells the user what unit feels natural.
   distanceHint: string;
@@ -43,6 +51,7 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
     label: 'Running',
     icon: Footprints,
     raceable: true,
+    cardio: true,
     distanceHint: 'Meters — roughly 1,609 per mile, 1,000 per km.',
     events: [
       { label: '5K', distanceMeters: 5000 },
@@ -63,6 +72,7 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
     label: 'Cycling',
     icon: Bike,
     raceable: true,
+    cardio: true,
     distanceHint: 'Meters — roughly 1,609 per mile, 1,000 per km.',
     events: [
       { label: 'Century (100 mi)', distanceMeters: 160934 },
@@ -82,6 +92,7 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
     label: 'Swimming',
     icon: Waves,
     raceable: true,
+    cardio: true,
     distanceHint: 'Meters — pool lengths are usually 25 or 50.',
     events: [
       { label: '1500m', distanceMeters: 1500 },
@@ -101,6 +112,7 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
     label: 'Rowing',
     icon: Sailboat,
     raceable: true,
+    cardio: true,
     distanceHint: 'Meters — standard erg pieces are 2,000 and 5,000.',
     events: [
       { label: '2K erg', distanceMeters: 2000 },
@@ -119,6 +131,7 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
     label: 'Lifting',
     icon: Dumbbell,
     raceable: false,
+    cardio: false,
     distanceHint: 'Meters — most lifting sessions are tracked by duration; leave blank if so.',
     events: [],
     levelDescriptions: {
@@ -133,6 +146,7 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
     label: 'Sports',
     icon: Trophy,
     raceable: false,
+    cardio: false,
     distanceHint: 'Meters — most sport sessions are tracked by duration; leave blank if so.',
     events: [],
     levelDescriptions: {
@@ -156,6 +170,7 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
     label: 'Walking',
     icon: PersonStanding,
     raceable: false,
+    cardio: true,
     distanceHint: 'Meters — roughly 1,609 per mile, 1,000 per km.',
     events: [],
     levelDescriptions: {
@@ -170,10 +185,14 @@ export const DISCIPLINES: Record<Discipline, DisciplineConfig> = {
 export const DISCIPLINE_LIST: DisciplineConfig[] = Object.values(DISCIPLINES);
 export const DEFAULT_DISCIPLINE: Discipline = 'running';
 
-// "Mix / all of the above" only combines race sports -- Lifting and Sports run
-// through the no-event budget path, which doesn't compose with a mixed race
-// goal.
-export const MIX_DISCIPLINE_LIST: DisciplineConfig[] = DISCIPLINE_LIST.filter((d) => d.raceable);
+// "Mix / all of the above" combines any cardio discipline -- walking included,
+// even though it's not raceable (same weekly-budget path as General fitness).
+// Lifting and Sports stay out: they're "other training", not something the
+// plan generator prescribes sessions for.
+export const MIX_DISCIPLINE_LIST: DisciplineConfig[] = DISCIPLINE_LIST.filter((d) => d.cardio);
+
+// The five disciplines the plan generator has a session library for.
+export const CARDIO_DISCIPLINES: Discipline[] = DISCIPLINE_LIST.filter((d) => d.cardio).map((d) => d.id);
 
 // Saved blocks from before disciplines existed have no `discipline` -- treat
 // them as Running everywhere rather than special-casing each call site.

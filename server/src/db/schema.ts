@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   doublePrecision,
   index,
   integer,
@@ -54,6 +55,14 @@ export const athletes = pgTable('athletes', {
     .references(() => users.id, { onDelete: 'cascade' }),
   daysPerWeek: integer('days_per_week').notNull(),
   otherTraining: jsonb('other_training').notNull().default(sql`'[]'::jsonb`),
+  // Phase 2: plan generator. Weekday arrays (0 = Sunday .. 6 = Saturday),
+  // nullable -- null means "not collected yet", same meaning as the
+  // client's Athlete.trainingWeekdays/otherTrainingWeekdays.
+  trainingWeekdays: jsonb('training_weekdays'),
+  otherTrainingWeekdays: jsonb('other_training_weekdays'),
+  // Display/entry only on the client; stored here too so it travels with
+  // the rest of the athlete's state across devices.
+  unitSystem: text('unit_system').notNull().default('metric'),
   updatedAt,
 });
 
@@ -116,11 +125,25 @@ export const prescribedSessions = pgTable(
       .references(() => blocks.id, { onDelete: 'cascade' }),
     date: text('date').notNull(),
     type: text('type').notNull(),
+    // Phase 2: plan generator. All nullable/defaulted -- existing rows need
+    // no backfill; see client schema.ts's PrescribedSession comments for
+    // what each one means.
+    discipline: text('discipline'),
+    intensity: text('intensity'),
     reps: integer('reps'),
+    steps: jsonb('steps'),
     targetPaceSecondsPerKm: doublePrecision('target_pace_seconds_per_km'),
+    targetPaceSecondsPer100m: doublePrecision('target_pace_seconds_per_100m'),
+    targetSplitSecondsPer500m: doublePrecision('target_split_seconds_per_500m'),
+    targetZoneLabel: text('target_zone_label'),
+    targetRpeMin: integer('target_rpe_min'),
+    targetRpeMax: integer('target_rpe_max'),
     targetRestSeconds: integer('target_rest_seconds'),
     targetDurationSeconds: integer('target_duration_seconds'),
+    targetDistanceMeters: doublePrecision('target_distance_meters'),
     note: text('note'),
+    source: text('source').notNull().default('generated'),
+    edited: boolean('edited').notNull().default(false),
     updatedAt,
   },
   (t) => [index('prescribed_sessions_block_date_idx').on(t.blockId, t.date)],

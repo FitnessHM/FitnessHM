@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from 'vitest';
 import { db } from './schema';
 import {
   getAthlete, saveAthlete, createBlock, getBlock, getActiveBlock, startNewBlock,
-  addTimedEffort, listEffortsForBlock, createPrescribedSession,
+  addTimedEffort, listEffortsForBlock, createPrescribedSession, createPrescribedSessions,
   listSessionsForBlock, getNextUnloggedSession, createSessionLog,
   listLogsForBlock, countCutShortReasons,
 } from './repository';
@@ -14,10 +14,27 @@ beforeEach(async () => {
 
 test('saveAthlete/getAthlete round-trip the singleton', async () => {
   expect(await getAthlete()).toBeUndefined();
-  await saveAthlete(4, ['lifting', 'sport']);
+  await saveAthlete({
+    daysPerWeek: 4,
+    otherTraining: ['lifting', 'sport'],
+    trainingWeekdays: [1, 3, 5, 6],
+    otherTrainingWeekdays: [2, 4],
+    unitSystem: 'imperial',
+  });
   const athlete = await getAthlete();
   expect(athlete?.daysPerWeek).toBe(4);
   expect(athlete?.otherTraining).toEqual(['lifting', 'sport']);
+  expect(athlete?.trainingWeekdays).toEqual([1, 3, 5, 6]);
+  expect(athlete?.otherTrainingWeekdays).toEqual([2, 4]);
+  expect(athlete?.unitSystem).toBe('imperial');
+});
+
+test('saveAthlete defaults the new fields when the caller omits them', async () => {
+  await saveAthlete({ daysPerWeek: 3, otherTraining: ['none'] });
+  const athlete = await getAthlete();
+  expect(athlete?.trainingWeekdays).toBeNull();
+  expect(athlete?.otherTrainingWeekdays).toBeNull();
+  expect(athlete?.unitSystem).toBe('metric');
 });
 
 test('createBlock assigns id/createdAt/active status and getBlock retrieves it', async () => {
@@ -93,6 +110,23 @@ test('getNextUnloggedSession returns the soonest future session with no log', as
 
   const nextAfterLog = await getNextUnloggedSession(block.id);
   expect(nextAfterLog?.date).toBe(future2);
+});
+
+test('createPrescribedSessions bulk-inserts a whole plan in one touchMeta', async () => {
+  const block = await createBlock({
+    eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'time', goalTimeSeconds: 1200,
+    targetDate: '2026-11-01', baselineSource: 'known', raceMantra: null, targetSplitSecondsPerKm: null,
+  });
+  const drafts = [
+    { blockId: block.id, date: '2026-09-01', type: 'easy' as const, reps: null, targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: 1800, note: null },
+    { blockId: block.id, date: '2026-09-03', type: 'tempo' as const, reps: null, targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: 1200, note: null },
+  ];
+  const created = await createPrescribedSessions(drafts);
+  expect(created).toHaveLength(2);
+  expect(new Set(created.map((s) => s.id)).size).toBe(2);
+
+  const stored = await listSessionsForBlock(block.id);
+  expect(stored.map((s) => s.date)).toEqual(['2026-09-01', '2026-09-03']);
 });
 
 test('countCutShortReasons tallies reasons across logs', async () => {

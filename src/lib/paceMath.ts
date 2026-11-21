@@ -27,11 +27,11 @@ export function riegelEquivalent(
 }
 
 export interface TrainingZones {
-  rep: { minSecondsPerKm: number; maxSecondsPerKm: number };
-  vo2: { minSecondsPerKm: number; maxSecondsPerKm: number };
-  threshold: { minSecondsPerKm: number; maxSecondsPerKm: number };
-  tempo: { minSecondsPerKm: number; maxSecondsPerKm: number };
-  easy: { minSecondsPerKm: number; maxSecondsPerKm: number };
+  rep: { minSecondsPerUnit: number; maxSecondsPerUnit: number };
+  vo2: { minSecondsPerUnit: number; maxSecondsPerUnit: number };
+  threshold: { minSecondsPerUnit: number; maxSecondsPerUnit: number };
+  tempo: { minSecondsPerUnit: number; maxSecondsPerUnit: number };
+  easy: { minSecondsPerUnit: number; maxSecondsPerUnit: number };
 }
 
 // [fasterPct, slowerPct] of threshold pace. Threshold = ~1hr race pace.
@@ -43,17 +43,23 @@ const ZONE_PACE_PERCENT: Record<keyof TrainingZones, [number, number]> = {
   easy: [1.16, 1.29],
 };
 
+// `unitDistanceMeters` is the "per" in the returned pace -- 1000 (per km,
+// the default) for running/walking, 100 for swimming, 500 for rowing. The
+// percent-of-threshold-pace table above is discipline-agnostic (it's a
+// ratio, not an absolute pace) -- only the denominator changes. Existing
+// running callers passing no third argument are unaffected.
 export function trainingZonesFromBaseline(
   baselineDistanceMeters: number,
-  baselineTimeSeconds: number
+  baselineTimeSeconds: number,
+  unitDistanceMeters = 1000
 ): TrainingZones {
-  const thresholdPace = paceSecondsPerKm(baselineDistanceMeters, baselineTimeSeconds);
+  const thresholdPace = baselineTimeSeconds / (baselineDistanceMeters / unitDistanceMeters);
   const zones = {} as TrainingZones;
   (Object.keys(ZONE_PACE_PERCENT) as (keyof TrainingZones)[]).forEach((zone) => {
     const [fasterPct, slowerPct] = ZONE_PACE_PERCENT[zone];
     zones[zone] = {
-      minSecondsPerKm: thresholdPace * fasterPct,
-      maxSecondsPerKm: thresholdPace * slowerPct,
+      minSecondsPerUnit: thresholdPace * fasterPct,
+      maxSecondsPerUnit: thresholdPace * slowerPct,
     };
   });
   return zones;

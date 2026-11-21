@@ -9,6 +9,9 @@ import { ensureUser } from '../lib/users.js';
 const athleteSchema = z.object({
   daysPerWeek: z.number().int(),
   otherTraining: z.array(z.enum(['lifting', 'sport', 'classes', 'none'])),
+  trainingWeekdays: z.array(z.number().int().min(0).max(6)).nullish(),
+  otherTrainingWeekdays: z.array(z.number().int().min(0).max(6)).nullish(),
+  unitSystem: z.enum(['metric', 'imperial']).nullish(),
 });
 
 const blockSchema = z.object({
@@ -40,20 +43,57 @@ const effortSchema = z.object({
   kind: z.enum(['baseline', 'checkpoint', 'race']),
 });
 
+// Every type across every discipline's session library (see
+// docs/superpowers/specs/2026-11-21-phase2-plans-design.md). This is
+// exactly the bug class that broke running-only sync in Phase 1 pre-work --
+// a type the client/generator can produce that this enum doesn't know about
+// silently fails validation and the whole PUT 400s. Keep this list in sync
+// with src/db/schema.ts's SessionType union.
+const sessionTypeSchema = z.enum([
+  'easy', 'long_run', 'tempo', 'threshold', 'vo2max',
+  'reps_short', 'reps_800', 'fartlek', 'hills', 'strides',
+  'time_trial', 'cross_training', 'rest',
+  'bike_endurance', 'bike_sweet_spot_threshold', 'bike_vo2_intervals',
+  'bike_long_ride', 'bike_recovery_spin', 'bike_time_trial',
+  'swim_technique_drill', 'swim_aerobic_sets', 'swim_threshold_css',
+  'swim_continuous', 'swim_time_trial',
+  'row_steady_state', 'row_threshold_pieces', 'row_intervals', 'row_time_trial',
+  'walk_brisk', 'walk_long', 'walk_hills',
+]);
+
+const intervalStepSchema = z.object({
+  reps: z.number().int(),
+  workSeconds: z.number().nullable(),
+  workMeters: z.number().nullable(),
+  restSeconds: z.number(),
+});
+
 const sessionSchema = z.object({
   id: z.string().uuid(),
   blockId: z.string().uuid(),
   date: z.string(),
-  type: z.enum([
-    'easy', 'long_run', 'tempo', 'threshold', 'vo2max',
-    'reps_short', 'reps_800', 'fartlek', 'hills', 'strides',
-    'time_trial', 'cross_training', 'rest',
-  ]),
+  type: sessionTypeSchema,
+  discipline: z.string().nullish(),
+  intensity: z.enum(['easy', 'moderate', 'hard']).nullish(),
   reps: z.number().nullable(),
+  steps: z.array(intervalStepSchema).nullish(),
   targetPaceSecondsPerKm: z.number().nullable(),
+  targetPaceSecondsPer100m: z.number().nullish(),
+  targetSplitSecondsPer500m: z.number().nullish(),
+  targetZoneLabel: z.string().nullish(),
+  targetRpeMin: z.number().nullish(),
+  targetRpeMax: z.number().nullish(),
   targetRestSeconds: z.number().nullable(),
   targetDurationSeconds: z.number().nullable(),
+  targetDistanceMeters: z.number().nullish(),
   note: z.string().nullable(),
+  // Optional, not nullable -- matches the client's PrescribedSession type
+  // exactly (`source?: SessionSource`, `edited?: boolean`, never `| null`).
+  // `source`/`edited` back a NOT NULL + DEFAULT column (see schema.ts);
+  // `undefined` lets the insert fall through to that default, `null` would
+  // be a type error at the insert call site below.
+  source: z.enum(['generated', 'user']).optional(),
+  edited: z.boolean().optional(),
 });
 
 const logSchema = z.object({
@@ -116,7 +156,16 @@ stateRouter.get('/api/state', requireUser, async (req, res) => {
 
   res.json({
     updatedAt: user!.stateUpdatedAt.toISOString(),
-    athlete: athleteRow ? { id: 1, daysPerWeek: athleteRow.daysPerWeek, otherTraining: athleteRow.otherTraining } : null,
+    athlete: athleteRow
+      ? {
+          id: 1,
+          daysPerWeek: athleteRow.daysPerWeek,
+          otherTraining: athleteRow.otherTraining,
+          trainingWeekdays: athleteRow.trainingWeekdays,
+          otherTrainingWeekdays: athleteRow.otherTrainingWeekdays,
+          unitSystem: athleteRow.unitSystem,
+        }
+      : null,
     blocks: blockRows.map((r) => omit(r, ['userId', 'updatedAt'])),
     efforts: effortRows.map((r) => omit(r, ['userId', 'updatedAt'])),
     sessions: sessionRows.map((r) => omit(r, ['userId', 'updatedAt'])),
@@ -159,16 +208,19 @@ stateRouter.put('/api/state', requireUser, async (req, res) => {
     await tx.delete(blocks).where(eq(blocks.userId, uid));
 
     if (payload.athlete) {
+      const athleteFields = {
+        daysPerWeek: payload.athlete.daysPerWeek,
+        otherTraining: payload.athlete.otherTraining,
+        trainingWeekdays: payload.athlete.trainingWeekdays ?? null,
+        otherTrainingWeekdays: payload.athlete.otherTrainingWeekdays ?? null,
+        unitSystem: payload.athlete.unitSystem ?? 'metric',
+      };
       await tx
         .insert(athletes)
-        .values({ userId: uid, daysPerWeek: payload.athlete.daysPerWeek, otherTraining: payload.athlete.otherTraining })
+        .values({ userId: uid, ...athleteFields })
         .onConflictDoUpdate({
           target: athletes.userId,
-          set: {
-            daysPerWeek: payload.athlete.daysPerWeek,
-            otherTraining: payload.athlete.otherTraining,
-            updatedAt: sql`now()`,
-          },
+          set: { ...athleteFields, updatedAt: sql`now()` },
         });
     } else {
       await tx.delete(athletes).where(eq(athletes.userId, uid));

@@ -21,11 +21,11 @@ test('riegelEquivalent predicts a longer-distance time from a known result', () 
 
 test('trainingZonesFromBaseline orders zones from fastest (rep) to slowest (easy)', () => {
   const zones = trainingZonesFromBaseline(5000, 1200); // 4:00/km threshold-ish baseline
-  expect(zones.rep.minSecondsPerKm).toBeLessThan(zones.vo2.minSecondsPerKm);
-  expect(zones.vo2.minSecondsPerKm).toBeLessThan(zones.threshold.minSecondsPerKm);
-  expect(zones.threshold.minSecondsPerKm).toBeLessThan(zones.tempo.minSecondsPerKm);
-  expect(zones.tempo.minSecondsPerKm).toBeLessThan(zones.easy.minSecondsPerKm);
-  expect(zones.easy.minSecondsPerKm).toBeLessThan(zones.easy.maxSecondsPerKm);
+  expect(zones.rep.minSecondsPerUnit).toBeLessThan(zones.vo2.minSecondsPerUnit);
+  expect(zones.vo2.minSecondsPerUnit).toBeLessThan(zones.threshold.minSecondsPerUnit);
+  expect(zones.threshold.minSecondsPerUnit).toBeLessThan(zones.tempo.minSecondsPerUnit);
+  expect(zones.tempo.minSecondsPerUnit).toBeLessThan(zones.easy.minSecondsPerUnit);
+  expect(zones.easy.minSecondsPerUnit).toBeLessThan(zones.easy.maxSecondsPerUnit);
 });
 
 test('bestEquivalentEffort returns null for an empty list', () => {

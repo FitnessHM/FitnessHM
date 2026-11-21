@@ -93,7 +93,7 @@ export function computeInsight(params: {
     }
     if (easyPaces.length >= 2) {
       const avgPace = easyPaces.reduce((a, b) => a + b, 0) / easyPaces.length;
-      const ceiling = zones.easy.minSecondsPerKm;
+      const ceiling = zones.easy.minSecondsPerUnit;
       if (avgPace < ceiling - 5) {
         const diff = Math.round(ceiling - avgPace);
         return { text: `Your easy runs have averaged ${diff}s/km faster than your easy-pace ceiling this week.` };

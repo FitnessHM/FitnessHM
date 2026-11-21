@@ -1,6 +1,6 @@
 import { db } from './schema';
 import type {
-  Athlete, TrainingBlock, TimedEffort, PrescribedSession, SessionLog, OtherTraining,
+  Athlete, TrainingBlock, TimedEffort, PrescribedSession, SessionLog, OtherTraining, Weekday, UnitSystem,
 } from './schema';
 import { todayIso } from '../lib/dates';
 
@@ -15,8 +15,27 @@ export async function getAthlete(): Promise<Athlete | undefined> {
   return db.athlete.get(1);
 }
 
-export async function saveAthlete(daysPerWeek: number, otherTraining: OtherTraining[]): Promise<Athlete> {
-  const athlete: Athlete = { id: 1, daysPerWeek, otherTraining };
+export interface SaveAthleteInput {
+  daysPerWeek: number;
+  otherTraining: OtherTraining[];
+  // Both optional, defaulting to null -- callers that haven't been updated
+  // for the weekday pickers yet (there are none left after this phase, but
+  // kept optional for the same reason every other new field on this object
+  // is) fall through to the generator's own `defaultTrainingWeekdays`.
+  trainingWeekdays?: Weekday[] | null;
+  otherTrainingWeekdays?: Weekday[] | null;
+  unitSystem?: UnitSystem;
+}
+
+export async function saveAthlete(input: SaveAthleteInput): Promise<Athlete> {
+  const athlete: Athlete = {
+    id: 1,
+    daysPerWeek: input.daysPerWeek,
+    otherTraining: input.otherTraining,
+    trainingWeekdays: input.trainingWeekdays ?? null,
+    otherTrainingWeekdays: input.otherTrainingWeekdays ?? null,
+    unitSystem: input.unitSystem ?? 'metric',
+  };
   await db.transaction('rw', db.athlete, db.meta, async () => {
     await db.athlete.put(athlete);
     await touchMeta();
@@ -80,6 +99,17 @@ export async function createPrescribedSession(input: Omit<PrescribedSession, 'id
     await touchMeta();
   });
   return session;
+}
+
+// Persists a whole generated plan in one go -- one touchMeta, not one per
+// session. Used by onboarding's finish step and Home's "Build my plan".
+export async function createPrescribedSessions(inputs: Omit<PrescribedSession, 'id'>[]): Promise<PrescribedSession[]> {
+  const sessions: PrescribedSession[] = inputs.map((input) => ({ ...input, id: crypto.randomUUID() }));
+  await db.transaction('rw', db.sessions, db.meta, async () => {
+    await db.sessions.bulkAdd(sessions);
+    await touchMeta();
+  });
+  return sessions;
 }
 
 export async function listSessionsForBlock(blockId: string): Promise<PrescribedSession[]> {
