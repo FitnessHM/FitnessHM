@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, Shuffle } from 'lucide-react';
-import type { GoalType, BaselineSource, OtherTraining } from '../../db/schema';
+import type { GoalType, BaselineSource, OtherTraining, TrainingBlock, Weekday, UnitSystem } from '../../db/schema';
 import {
   DISCIPLINES,
   DISCIPLINE_LIST,
@@ -8,18 +8,34 @@ import {
   DEFAULT_DISCIPLINE,
   LEVELS,
   disciplineConfig,
+  disciplineLabel,
   isGeneralFitnessEvent,
   levelLabel,
   type Discipline,
   type Level,
 } from '../../lib/disciplines';
-import { saveAthlete, startNewBlock, addTimedEffort, createPrescribedSession } from '../../db/repository';
-import { isoDateLocal, todayIso } from '../../lib/dates';
+import { saveAthlete, startNewBlock, addTimedEffort, createPrescribedSessions } from '../../db/repository';
+import { todayIso } from '../../lib/dates';
+import { generatePlan, type PrescribedSessionDraft } from '../../lib/plan/generate';
+import { defaultTrainingWeekdays } from '../../lib/plan/weekdays';
+import { daysBetweenIso } from '../../lib/plan/dateUtils';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import SessionTypeIcon, { sessionTypeLabel } from '../../components/SessionTypeIcon';
+import { formatMmSs } from '../../lib/format';
 
 const OTHER_TRAINING_OPTIONS: OtherTraining[] = ['lifting', 'sport', 'classes', 'none'];
 const QUESTION_COUNT = 6;
+
+const WEEKDAY_OPTIONS: { value: Weekday; label: string }[] = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+];
 
 const FIELD_CLASSES = 'block w-full mt-1.5 bg-surface border border-border-strong rounded-control p-3 font-body text-body text-primary focus:outline-none focus:border-accent';
 const LABEL_CLASSES = 'block font-body text-label font-semibold uppercase tracking-wide text-secondary';
@@ -50,10 +66,15 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
   const [targetDate, setTargetDate] = useState('');
   const [baselineSource, setBaselineSource] = useState<BaselineSource>('unknown');
   const [baselineTime, setBaselineTime] = useState('');
-  const [daysPerWeek, setDaysPerWeek] = useState(3);
+  const [trainingWeekdays, setTrainingWeekdays] = useState<Weekday[]>(() => defaultTrainingWeekdays(3));
+  const [otherTrainingWeekdays, setOtherTrainingWeekdays] = useState<Weekday[]>([]);
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
   const [otherTraining, setOtherTraining] = useState<OtherTraining[]>([]);
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Full generated plan, computed on "Finish" and shown as a preview before
+  // anything is persisted -- see handlePreview/handleConfirm.
+  const [planDrafts, setPlanDrafts] = useState<PrescribedSessionDraft[] | null>(null);
 
   const selectedDisciplines: Discipline[] =
     interest === 'mix' ? mixDisciplines : interest ? [interest] : [];
@@ -83,6 +104,7 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
     : eventLabel !== '' && (goalType !== 'time' || goalTimeSeconds !== null);
   const step4Valid = targetDate !== '';
   const step5Valid = showWeeklyBudget || baselineSource === 'unknown' || baselineTimeSeconds !== null;
+  const step6Valid = trainingWeekdays.length >= 1;
 
   const pickInterest = (d: Discipline) => {
     setInterest(d);
@@ -117,6 +139,14 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
     setOtherTraining((prev) => (prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]));
   };
 
+  const toggleTrainingWeekday = (day: Weekday) => {
+    setTrainingWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
+  const toggleOtherTrainingWeekday = (day: Weekday) => {
+    setOtherTrainingWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
   // Leaving the level step: make sure the event step has a concrete
   // discipline + event to show (a Mix block hasn't chosen one yet).
   const goToEventStep = () => {
@@ -128,13 +158,10 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
     setStep(3);
   };
 
-  const handleFinish = async () => {
-    // Guards against a double-click (or a slow render re-firing the handler)
-    // creating two blocks — startNewBlock alone only guarantees one *active*
-    // block, not that a second call can't run at all.
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
+  // Shared by the preview (a throwaway id/createdAt/status -- never
+  // persisted) and handleConfirm (the real startNewBlock call) so both
+  // see exactly the same goal/event/discipline shape.
+  const buildBlockFields = () => {
     const primaryDiscipline = eventListDiscipline;
     const cfg = disciplineConfig(primaryDiscipline);
     const chosenEvent = cfg.events.find((e) => e.label === eventLabel);
@@ -149,51 +176,95 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
         ? sports.join(', ')
         : cfg.label;
 
-    await saveAthlete(daysPerWeek, otherTraining);
-    const block = await startNewBlock({
+    return {
+      primaryDiscipline,
+      budgetOnly,
       eventDistanceMeters,
-      eventLabel: resolvedEventLabel,
-      goalType: budgetOnly ? 'consistency' : goalType,
-      goalTimeSeconds: !budgetOnly && goalType === 'time' ? goalTimeSeconds : null,
-      targetDate,
-      baselineSource: budgetOnly ? 'unknown' : baselineSource,
-      raceMantra: null,
-      targetSplitSecondsPerKm: null,
-      discipline: primaryDiscipline,
-      level: levels[primaryDiscipline] ?? null,
-      disciplines: selectedDisciplines,
-      disciplineLevels: levels,
-      weeklyHours: budgetOnly && weeklyHoursValid ? weeklyHoursValue : null,
-      sports: sports.length > 0 ? sports : null,
-    });
+      fields: {
+        eventDistanceMeters,
+        eventLabel: resolvedEventLabel,
+        goalType: budgetOnly ? 'consistency' as GoalType : goalType,
+        goalTimeSeconds: !budgetOnly && goalType === 'time' ? goalTimeSeconds : null,
+        targetDate,
+        baselineSource: budgetOnly ? ('unknown' as BaselineSource) : baselineSource,
+        raceMantra: null,
+        targetSplitSecondsPerKm: null,
+        discipline: primaryDiscipline,
+        level: levels[primaryDiscipline] ?? null,
+        disciplines: selectedDisciplines,
+        disciplineLevels: levels,
+        weeklyHours: budgetOnly && weeklyHoursValid ? weeklyHoursValue : null,
+        sports: sports.length > 0 ? sports : null,
+      },
+    };
+  };
 
-    if (!budgetOnly && baselineSource !== 'unknown') {
-      if (baselineTimeSeconds !== null) {
-        await addTimedEffort({
-          blockId: block.id,
-          date: todayIso(),
-          distanceMeters: eventDistanceMeters,
-          timeSeconds: baselineTimeSeconds,
-          kind: 'baseline',
-        });
-      }
-    } else if (!budgetOnly) {
-      const weekOne = isoDateLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-      await createPrescribedSession({
+  const athleteInput = () => ({
+    id: 1 as const,
+    daysPerWeek: trainingWeekdays.length,
+    otherTraining,
+    trainingWeekdays,
+    otherTrainingWeekdays,
+    unitSystem,
+  });
+
+  // Generates the plan for a given (not-yet-persisted) block, used both for
+  // the preview and -- again, with the real block.id -- for what actually
+  // gets saved on Confirm.
+  const generateFor = (block: TrainingBlock) => {
+    const { primaryDiscipline, budgetOnly, eventDistanceMeters } = buildBlockFields();
+    const baselines =
+      !budgetOnly && baselineSource !== 'unknown' && baselineTimeSeconds !== null
+        ? {
+            [primaryDiscipline]: {
+              id: 'preview', blockId: block.id, date: todayIso(),
+              distanceMeters: eventDistanceMeters, timeSeconds: baselineTimeSeconds, kind: 'baseline' as const,
+            },
+          }
+        : {};
+    return generatePlan({ today: todayIso(), block, athlete: athleteInput(), baselines, fixedSessions: [] });
+  };
+
+  const handlePreview = () => {
+    const { fields } = buildBlockFields();
+    const placeholderBlock: TrainingBlock = { ...fields, id: 'preview', createdAt: '', status: 'active' };
+    setPlanDrafts(generateFor(placeholderBlock));
+    setStep(7);
+  };
+
+  const handleConfirm = async () => {
+    // Guards against a double-click (or a slow render re-firing the handler)
+    // creating two blocks — startNewBlock alone only guarantees one *active*
+    // block, not that a second call can't run at all.
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    const { budgetOnly, eventDistanceMeters, fields } = buildBlockFields();
+    await saveAthlete(athleteInput());
+    const block = await startNewBlock(fields);
+
+    if (!budgetOnly && baselineSource !== 'unknown' && baselineTimeSeconds !== null) {
+      await addTimedEffort({
         blockId: block.id,
-        date: weekOne,
-        type: 'time_trial',
-        reps: null, targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: null,
-        note: 'A baseline test tells us where you are really starting from.',
+        date: todayIso(),
+        distanceMeters: eventDistanceMeters,
+        timeSeconds: baselineTimeSeconds,
+        kind: 'baseline',
       });
     }
+
+    // Regenerated (not reused from the preview) so every draft carries the
+    // block's real id -- generatePlan is pure/deterministic, so this
+    // produces the exact same plan the preview showed.
+    const finalDrafts = generateFor(block);
+    if (finalDrafts.length > 0) await createPrescribedSessions(finalDrafts);
 
     onComplete(block.id);
   };
 
-  const onFinishClick = () => {
-    handleFinish().catch((err) => {
-      console.error('onboarding finish failed', err);
+  const onConfirmClick = () => {
+    handleConfirm().catch((err) => {
+      console.error('onboarding confirm failed', err);
       setIsSubmitting(false);
     });
   };
@@ -215,7 +286,9 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
 
   return (
     <div className="mx-auto max-w-md space-y-6 p-6">
-      <WizardHeader step={step} onBack={() => setStep(step - 1)} showBack={step > 1 || showWelcome} />
+      {step <= QUESTION_COUNT && (
+        <WizardHeader step={step} onBack={() => setStep(step - 1)} showBack={step > 1 || showWelcome} />
+      )}
 
       {step === 1 && (
         <Card as="fieldset" className="space-y-4">
@@ -458,11 +531,67 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
       )}
 
       {step === 6 && (
-        <Card as="fieldset" className="space-y-4">
+        <Card as="fieldset" className="space-y-5">
+          <div>
+            <p className={LABEL_CLASSES}>Which days can you train?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {WEEKDAY_OPTIONS.map(({ value, label }) => {
+                const selected = trainingWeekdays.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={selected}
+                    aria-label={`train on ${label}`}
+                    onClick={() => toggleTrainingWeekday(value)}
+                    className={`pressable rounded-control border px-3 py-2 font-body text-body font-semibold transition-colors ${
+                      selected ? 'border-accent bg-accent/10 text-primary' : 'border-border-strong bg-surface text-secondary hover:border-accent/40'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {trainingWeekdays.length === 0 && (
+              <p className="mt-1 font-body text-caption text-caution">Pick at least one day.</p>
+            )}
+          </div>
+
+          <div>
+            <p className={LABEL_CLASSES}>Any of those also a lifting or sport day?</p>
+            <p className="mt-0.5 font-body text-caption text-secondary">
+              We'll keep the hard cardio sessions off these -- an easy one is still fine.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {WEEKDAY_OPTIONS.filter((o) => trainingWeekdays.includes(o.value)).map(({ value, label }) => {
+                const selected = otherTrainingWeekdays.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={selected}
+                    aria-label={`lift or sport on ${label}`}
+                    onClick={() => toggleOtherTrainingWeekday(value)}
+                    className={`pressable rounded-control border px-3 py-2 font-body text-body font-semibold transition-colors ${
+                      selected ? 'border-accent bg-accent/10 text-primary' : 'border-border-strong bg-surface text-secondary hover:border-accent/40'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <label className={LABEL_CLASSES}>
-            Days per week
-            <input aria-label="days per week" type="number" min={1} max={7} value={daysPerWeek} onChange={(e) => setDaysPerWeek(Number(e.target.value))} className={FIELD_CLASSES} />
+            Units
+            <select aria-label="units" value={unitSystem} onChange={(e) => setUnitSystem(e.target.value as UnitSystem)} className={FIELD_CLASSES}>
+              <option value="metric">Kilometers</option>
+              <option value="imperial">Miles</option>
+            </select>
           </label>
+
           <div>
             <p className={LABEL_CLASSES}>Other training happening</p>
             <div className="mt-2 space-y-2">
@@ -474,9 +603,83 @@ export default function OnboardingWizard({ onComplete, showWelcome = false }: Pr
               ))}
             </div>
           </div>
-          <Button onClick={onFinishClick} disabled={isSubmitting} className="w-full">Finish</Button>
+          <Button disabled={!step6Valid} onClick={handlePreview} className="w-full">Preview my plan</Button>
         </Card>
       )}
+
+      {step === 7 && planDrafts && (
+        <PlanPreview
+          drafts={planDrafts}
+          isSubmitting={isSubmitting}
+          onBack={() => setStep(6)}
+          onConfirm={onConfirmClick}
+        />
+      )}
+    </div>
+  );
+}
+
+function PlanPreview({
+  drafts,
+  isSubmitting,
+  onBack,
+  onConfirm,
+}: {
+  drafts: PrescribedSessionDraft[];
+  isSubmitting: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  const today = todayIso();
+  const firstTwoWeeks = drafts.filter((d) => daysBetweenIso(today, d.date) < 14).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const byWeek: PrescribedSessionDraft[][] = [[], []];
+  for (const d of firstTwoWeeks) {
+    byWeek[daysBetweenIso(today, d.date) < 7 ? 0 : 1].push(d);
+  }
+  const isMix = new Set(drafts.map((d) => d.discipline)).size > 1;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onBack} aria-label="back" className="pressable text-secondary">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <p className="font-display text-title text-primary">Here's your plan</p>
+      </div>
+      <p className="font-body text-body text-secondary">
+        The first two weeks, so you can see what training actually looks like before we save anything.
+        {drafts.length > firstTwoWeeks.length && ` The full plan runs ${drafts.length} sessions through your target date.`}
+      </p>
+
+      {byWeek.map((week, wi) =>
+        week.length === 0 ? null : (
+          <Card key={wi} className="space-y-3">
+            <p className="font-body text-label font-bold uppercase tracking-wide text-secondary">Week {wi + 1}</p>
+            <div className="space-y-2">
+              {week.map((s, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <SessionTypeIcon type={s.type} className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-body text-body font-semibold text-primary">
+                      {sessionTypeLabel(s.type)}
+                      {isMix && <span className="ml-2 font-body text-caption text-faint">{disciplineLabel(s.discipline)}</span>}
+                      <span className="ml-2 font-body text-caption text-secondary">
+                        {Math.round((s.targetDurationSeconds ?? 0) / 60)} min
+                        {s.targetPaceSecondsPerKm != null && ` @ ${formatMmSs(s.targetPaceSecondsPerKm)}/km`}
+                      </span>
+                    </p>
+                    {s.note && <p className="font-body text-caption text-secondary">{s.note}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      )}
+
+      <Button onClick={onConfirm} disabled={isSubmitting} className="w-full">
+        {isSubmitting ? 'Building your plan…' : 'Confirm and start'}
+      </Button>
     </div>
   );
 }

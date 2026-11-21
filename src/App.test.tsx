@@ -3,7 +3,23 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { beforeEach, expect, test } from 'vitest';
 import { db } from './db/schema';
+import { isoDateLocal } from './lib/dates';
 import App from './App';
+
+function futureTargetDate(daysOut = 84): string {
+  return isoDateLocal(new Date(Date.now() + daysOut * 86400000));
+}
+
+// Step 6's weekday picker defaults to Mon/Wed/Sat. Several tests here rely
+// on "nothing scheduled today" for the adhoc-logging path -- deselect
+// today's day (if it's one of the defaults) so that stays true regardless
+// of which real calendar day the suite happens to run on.
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+async function deselectToday(user: UserEvent) {
+  const label = WEEKDAY_LABELS[new Date().getDay()];
+  const button = screen.queryByRole('button', { name: `train on ${label}` });
+  if (button?.getAttribute('aria-pressed') === 'true') await user.click(button);
+}
 
 beforeEach(async () => {
   await Promise.all([db.athlete.clear(), db.blocks.clear(), db.efforts.clear(), db.sessions.clear(), db.logs.clear()]);
@@ -41,13 +57,15 @@ async function completeOnboardingWithEvent(user: UserEvent, event: string) {
   await user.selectOptions(screen.getByLabelText(/goal type/i), 'finish');
   await user.click(screen.getByRole('button', { name: /next/i }));
 
-  fireEvent.change(screen.getByLabelText(/target date/i), { target: { value: '2027-01-01' } });
+  fireEvent.change(screen.getByLabelText(/target date/i), { target: { value: futureTargetDate() } });
   await user.click(screen.getByRole('button', { name: /next/i }));
 
   await user.selectOptions(screen.getByLabelText('baseline'), 'unknown');
   await user.click(screen.getByRole('button', { name: /next/i }));
 
-  await user.click(screen.getByRole('button', { name: /finish/i }));
+  await deselectToday(user);
+  await user.click(screen.getByRole('button', { name: /preview my plan/i }));
+  await user.click(await screen.findByRole('button', { name: /confirm and start/i }));
 }
 
 test('a fresh install shows the welcome screen, then a populated home screen after setup', async () => {

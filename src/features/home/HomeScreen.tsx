@@ -13,6 +13,7 @@ import GoalStrip from './GoalStrip';
 import WeekRow from './WeekRow';
 import RecentList from './RecentList';
 import InsightCard from './InsightCard';
+import BuildPlanCard from './BuildPlanCard';
 
 interface Props {
   blockId: string;
@@ -26,6 +27,7 @@ export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onO
   const efforts = useLiveQuery(() => db.efforts.where('blockId').equals(blockId).sortBy('date'), [blockId]);
   const sessions = useLiveQuery(() => db.sessions.where('blockId').equals(blockId).sortBy('date'), [blockId]);
   const logs = useLiveQuery(() => db.logs.where('blockId').equals(blockId).toArray(), [blockId]);
+  const athlete = useLiveQuery(() => db.athlete.get(1), []);
 
   if (!block || !efforts || !sessions || !logs) {
     return <HomeScreenSkeleton />;
@@ -82,7 +84,15 @@ export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onO
     <div className="mx-auto max-w-2xl space-y-5 p-4 pb-10">
       <GreetingBar now={now} onOpenSettings={onOpenSettings} />
 
-      <TodayCard session={todaysSession} isLogged={isTodayLogged} onLog={() => onLogSession(todaysSession)} />
+      {sessions.length === 0 ? (
+        <BuildPlanCard
+          block={block}
+          athlete={athlete}
+          baselineEffort={baselineEffort ? { distanceMeters: baselineEffort.distanceMeters, timeSeconds: baselineEffort.timeSeconds } : null}
+        />
+      ) : (
+        <TodayCard session={todaysSession} isLogged={isTodayLogged} onLog={() => onLogSession(todaysSession)} />
+      )}
 
       <GoalStrip
         block={block}

@@ -90,9 +90,30 @@ test('shows a rest-day state and an empty recent list when there is nothing logg
     eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'finish', goalTimeSeconds: null,
     targetDate, baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
   });
+  // A plan with a real (non-today) session exists -- otherwise zero
+  // sessions reads as "no plan generated yet" (see the "Build my plan" test
+  // below), not "rest day."
+  await createPrescribedSession({
+    blockId: block.id, date: isoDateLocal(new Date(Date.now() + 86400000)), type: 'easy', reps: null,
+    targetPaceSecondsPerKm: null, targetRestSeconds: null, targetDurationSeconds: 1800, note: null,
+  });
 
   render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
 
   expect(await screen.findByText(/nothing scheduled today/i)).toBeInTheDocument();
   expect(screen.getByText(/nothing logged yet/i)).toBeInTheDocument();
+});
+
+test('shows a "Build my plan" card instead of today\'s session when the block has no generated sessions', async () => {
+  const targetDate = isoDateLocal(new Date(Date.now() + 42 * 86400000));
+  const block = await createBlock({
+    eventDistanceMeters: 5000, eventLabel: '5K', goalType: 'finish', goalTimeSeconds: null,
+    targetDate, baselineSource: 'unknown', raceMantra: null, targetSplitSecondsPerKm: null,
+  });
+
+  render(<HomeScreen blockId={block.id} onStartNewBlock={noop} onLogSession={noop} onOpenSettings={noop} />);
+
+  expect(await screen.findByText(/no plan yet/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /build my plan/i })).toBeInTheDocument();
+  expect(screen.queryByText(/nothing scheduled today/i)).not.toBeInTheDocument();
 });
