@@ -19,10 +19,12 @@ interface Props {
   blockId: string;
   onStartNewBlock: () => void;
   onLogSession: (session: PrescribedSession | null) => void;
+  // Settings is reached via AppShell's nav now (header/bottom tabs/sidebar)
+  // -- kept here so App.tsx doesn't need a signature change, unused below.
   onOpenSettings: () => void;
 }
 
-export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onOpenSettings }: Props) {
+export default function HomeScreen({ blockId, onStartNewBlock, onLogSession }: Props) {
   const block = useLiveQuery(() => db.blocks.get(blockId), [blockId]);
   const efforts = useLiveQuery(() => db.efforts.where('blockId').equals(blockId).sortBy('date'), [blockId]);
   const sessions = useLiveQuery(() => db.sessions.where('blockId').equals(blockId).sortBy('date'), [blockId]);
@@ -91,41 +93,51 @@ export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onO
   });
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 p-4 pb-10">
-      <GreetingBar now={now} onOpenSettings={onOpenSettings} />
+    <div className="mx-auto max-w-5xl space-y-5 p-4 pb-10 md:grid md:grid-cols-[1fr_22rem] md:items-start md:gap-6 md:space-y-0 md:p-6">
+      <div className="space-y-5 md:col-span-2">
+        <GreetingBar now={now} />
+      </div>
 
-      {!hasGeneratedPlan ? (
-        <BuildPlanCard
+      {/* Left/main column: the hero and this week -- the two things that
+          answer "what do I do right now." */}
+      <div className="space-y-5">
+        {!hasGeneratedPlan ? (
+          <BuildPlanCard
+            block={block}
+            athlete={athlete}
+            baselineEffort={baselineEffort ? { distanceMeters: baselineEffort.distanceMeters, timeSeconds: baselineEffort.timeSeconds } : null}
+          />
+        ) : (
+          <TodayCard session={todaysSession} isLogged={isTodayLogged} onLog={() => onLogSession(todaysSession)} />
+        )}
+
+        <section className="space-y-2">
+          <h2 className="font-body text-label font-bold uppercase tracking-wide text-secondary">This week</h2>
+          <WeekRow days={weekDays} onTapToday={() => onLogSession(todaysSession)} />
+        </section>
+      </div>
+
+      {/* Right/sidebar column on desktop, stacked below on mobile: goal
+          progress and supporting context -- quieter than the hero. */}
+      <div className="space-y-5">
+        <GoalStrip
           block={block}
-          athlete={athlete}
-          baselineEffort={baselineEffort ? { distanceMeters: baselineEffort.distanceMeters, timeSeconds: baselineEffort.timeSeconds } : null}
+          efforts={efforts}
+          daysRemaining={daysRemaining}
+          progress={progress}
+          feasibility={feasibility}
+          currentBestEquivalentSeconds={currentBestEquivalentSeconds}
         />
-      ) : (
-        <TodayCard session={todaysSession} isLogged={isTodayLogged} onLog={() => onLogSession(todaysSession)} />
-      )}
 
-      <GoalStrip
-        block={block}
-        efforts={efforts}
-        daysRemaining={daysRemaining}
-        progress={progress}
-        feasibility={feasibility}
-        currentBestEquivalentSeconds={currentBestEquivalentSeconds}
-      />
+        <section className="space-y-2">
+          <h2 className="font-body text-label font-bold uppercase tracking-wide text-secondary">Recent</h2>
+          <RecentList logs={logs} sessions={sessions} />
+        </section>
 
-      <section className="space-y-2">
-        <h2 className="font-body text-label font-bold uppercase tracking-wide text-secondary">This week</h2>
-        <WeekRow days={weekDays} onTapToday={() => onLogSession(todaysSession)} />
-      </section>
+        <InsightCard insight={insight} />
+      </div>
 
-      <section className="space-y-2">
-        <h2 className="font-body text-label font-bold uppercase tracking-wide text-secondary">Recent</h2>
-        <RecentList logs={logs} sessions={sessions} />
-      </section>
-
-      <InsightCard insight={insight} />
-
-      <div className="pt-2 text-center">
+      <div className="pt-2 text-center md:col-span-2">
         <Button variant="ghost" onClick={onStartNewBlock}>
           Start a new block
         </Button>
@@ -136,19 +148,25 @@ export default function HomeScreen({ blockId, onStartNewBlock, onLogSession, onO
 
 function HomeScreenSkeleton() {
   return (
-    <div className="mx-auto max-w-2xl space-y-5 p-4 pb-10">
+    <div className="mx-auto max-w-5xl space-y-5 p-4 pb-10 md:p-6">
       <div className="flex items-baseline justify-between">
         <Skeleton className="h-7 w-40" />
         <Skeleton className="h-4 w-28" />
       </div>
-      <Skeleton className="h-48 w-full rounded-card" />
-      <Skeleton className="h-20 w-full rounded-card" />
-      <div className="flex justify-between gap-1.5">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 flex-1" />
-        ))}
+      <div className="md:grid md:grid-cols-[1fr_22rem] md:gap-6 md:space-y-0 space-y-5">
+        <div className="space-y-5">
+          <Skeleton className="h-48 w-full rounded-card" />
+          <div className="flex justify-between gap-1.5">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 flex-1" />
+            ))}
+          </div>
+        </div>
+        <div className="space-y-5">
+          <Skeleton className="h-20 w-full rounded-card" />
+          <Skeleton className="h-24 w-full rounded-card" />
+        </div>
       </div>
-      <Skeleton className="h-24 w-full rounded-card" />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CalendarPlus } from 'lucide-react';
 import type { Athlete, TrainingBlock } from '../../db/schema';
 import type { Discipline } from '../../lib/disciplines';
 import { generatePlan } from '../../lib/plan/generate';
@@ -55,13 +56,18 @@ export default function BuildPlanCard({ block, athlete, baselineEffort }: Props)
   };
 
   return (
-    <Card raised className="space-y-3 text-center">
-      <p className="font-display text-title text-primary">No plan yet</p>
-      <p className="font-body text-body text-secondary">
-        This block doesn't have a generated training plan. Build one now from your goal and schedule.
-      </p>
+    <Card raised className="space-y-4 p-6 text-center">
+      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent/10">
+        <CalendarPlus className="h-6 w-6 text-accent" strokeWidth={2} />
+      </span>
+      <div className="space-y-1.5">
+        <p className="font-body text-heading font-bold text-primary">No plan yet</p>
+        <p className="font-body text-body text-secondary">
+          This block doesn't have a generated training plan. Build one now from your goal and schedule.
+        </p>
+      </div>
       {error && <p className="font-body text-caption text-caution">{error}</p>}
-      <Button onClick={onBuildClick} disabled={isBuilding} className="w-full">
+      <Button onClick={onBuildClick} disabled={isBuilding} className="w-full text-[1.0625rem]">
         {isBuilding ? 'Building…' : 'Build my plan'}
       </Button>
     </Card>
