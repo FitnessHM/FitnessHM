@@ -66,7 +66,7 @@ export default function GoalStrip({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-body text-heading-sm font-bold text-primary">{goalLine}</p>
+          <p className="font-body text-heading-sm font-bold leading-snug text-primary">{goalLine}</p>
           <p className="font-body text-caption text-secondary">
             {typeof daysRemaining === 'number' ? `${daysRemaining} days left` : 'No target date set'}
           </p>

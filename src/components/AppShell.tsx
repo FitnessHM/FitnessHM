@@ -20,6 +20,10 @@ interface Props {
   activeTab: Tab;
   onNavigate: (tab: Tab) => void;
   now?: Date;
+  // Defaults to the real Clerk avatar; overridable so the Clerk-free
+  // screenshot harness (previewMain.tsx) can swap in a placeholder instead
+  // of needing a live ClerkProvider.
+  avatar?: ReactNode;
 }
 
 /**
@@ -30,7 +34,8 @@ interface Props {
  * rolls out immediately rather than waiting behind the per-screen review
  * gate the way each screen's own inner content does.
  */
-export default function AppShell({ children, activeTab, onNavigate, now = new Date() }: Props) {
+export default function AppShell({ children, activeTab, onNavigate, now = new Date(), avatar }: Props) {
+  const avatarNode = avatar ?? <UserButton afterSignOutUrl="/" />;
   return (
     <div className="min-h-screen bg-bg text-primary md:flex">
       {/* Desktop: left sidebar nav, wordmark + date/avatar included. */}
@@ -56,7 +61,7 @@ export default function AppShell({ children, activeTab, onNavigate, now = new Da
           })}
         </nav>
         <div className="mt-auto flex items-center gap-3 px-2 pt-6">
-          <UserButton afterSignOutUrl="/" />
+          {avatarNode}
           <span className="font-body text-caption text-secondary">{formatHeaderDate(now)}</span>
         </div>
       </aside>
@@ -68,9 +73,7 @@ export default function AppShell({ children, activeTab, onNavigate, now = new Da
           <p className="font-display text-[1.5rem] leading-none text-primary md:hidden">FitnessHM</p>
           <div className="flex items-center gap-3">
             <span className="font-body text-caption text-secondary">{formatHeaderDate(now)}</span>
-            <span className="md:hidden">
-              <UserButton afterSignOutUrl="/" />
-            </span>
+            <span className="md:hidden">{avatarNode}</span>
           </div>
         </header>
 
