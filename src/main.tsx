@@ -1,4 +1,4 @@
-import { ClerkProvider, SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
+import { ClerkProvider, SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -33,9 +33,8 @@ if (window.location.pathname === '/privacy') {
         </SignedOut>
         <SignedIn>
           <SyncGate>
-            <div className="fixed top-3 right-3 z-50">
-              <UserButton afterSignOutUrl="/" />
-            </div>
+            {/* The avatar lives in AppShell's header now, not floating in
+                a corner -- see components/AppShell.tsx. */}
             <App />
           </SyncGate>
         </SignedIn>

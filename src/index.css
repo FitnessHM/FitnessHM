@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted -- no Google Fonts request, no render-blocking cross-origin
+   round trip, no FOIT while a stylesheet loads. Manrope ships as one
+   variable-font file covering the whole 400-800 weight range used across
+   the app; Bebas Neue only ever needs its one weight. */
+@font-face {
+  font-family: 'Bebas Neue';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/bebas-neue-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('./assets/fonts/manrope-variable.woff2') format('woff2');
+}
+
 /*
   Design tokens -- the single source of truth for color, referenced by
   tailwind.config.js as `bg-bg`, `text-accent`, etc. Never hardcode a hex
@@ -20,19 +39,47 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.16);
 
+  /* text-primary/secondary pass WCAG AA (4.5:1) on every surface already
+     (17.0/7.5:1+ on bg, 14.2/6.2:1+ on surface-raised). text-faint and
+     alert did not -- text-faint was as low as 2.66:1 on surface-raised
+     (needs 4.5), alert 4.57:1 on surface-raised (passes, but with near
+     zero margin for anti-aliasing/rendering variance). Both replaced with
+     values that clear 4.5:1 on bg, surface, AND surface-raised, checked
+     with the WCAG relative-luminance formula, not eyeballed. */
   --color-text-primary: #edf0f2;
   --color-text-secondary: #9aa1a9;
-  --color-text-faint: #5c6369;
+  --color-text-faint: #8a9097;
 
   --color-accent: #c6ff3d;
   --color-accent-foreground: #0b0d0f;
 
   --color-success: #5fae7a;
   --color-caution: #d9a441;
-  --color-alert: #d9645a;
+  --color-alert: #e07a70;
 
   --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
   --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Spacing scale -- a fixed set of steps instead of ad-hoc Tailwind
+     numbers, so gaps/padding across the app come from one ladder. Maps
+     to tailwind.config.js's `spacing` extension (space-3xs..space-2xl);
+     plain Tailwind spacing (p-4, gap-2, ...) still works and resolves to
+     the same underlying rem values -- this just names the steps that
+     recur as layout rhythm (card padding, section gaps, shell gutters).
+  */
+  --space-3xs: 0.25rem; /* 4px */
+  --space-2xs: 0.5rem; /* 8px */
+  --space-xs: 0.75rem; /* 12px */
+  --space-sm: 1rem; /* 16px */
+  --space-md: 1.5rem; /* 24px */
+  --space-lg: 2rem; /* 32px */
+  --space-xl: 3rem; /* 48px */
+  --space-2xl: 4rem; /* 64px */
+
+  /* Radius scale lives in tailwind.config.js (rounded-card/control/pill) --
+     this is the one extra step :focus-visible needs since it isn't a
+     Tailwind utility. */
+  --radius-sm: 8px;
 }
 
 html,
@@ -58,6 +105,36 @@ body {
 }
 .pressable:active {
   transform: scale(0.97);
+}
+
+/* One focus-ring treatment, everywhere -- accent-colored, offset so it
+   never blends into the dark surface it's sitting on. Browser default
+   focus rings are suppressed in favor of this (`outline: none` below)
+   only on elements that opt into `.pressable` or an explicit
+   `focus-visible:` utility; native `:focus-visible` keeps working for
+   anything that doesn't. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable {
+    transition: opacity 120ms ease-out;
+  }
+  .pressable:active {
+    transform: none;
+  }
+  .skeleton {
+    animation: none;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes skeleton-pulse {

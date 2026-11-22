@@ -1,10 +1,19 @@
 import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
-import { beforeEach, expect, test } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { db } from './db/schema';
 import { isoDateLocal } from './lib/dates';
 import App from './App';
+
+// App.tsx's shell (AppShell) renders Clerk's <UserButton/> in the header --
+// this test suite exercises onboarding/home/logger flows, not Clerk itself,
+// and doesn't wrap App in a <ClerkProvider> (App never needed one before).
+// Stubbed rather than adding a real provider: there's nothing Clerk-specific
+// under test here.
+vi.mock('@clerk/clerk-react', () => ({
+  UserButton: () => <div aria-label="user menu" />,
+}));
 
 function futureTargetDate(daysOut = 84): string {
   return isoDateLocal(new Date(Date.now() + daysOut * 86400000));

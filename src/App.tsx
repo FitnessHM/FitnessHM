@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { getActiveBlock } from './db/repository';
 import type { PrescribedSession } from './db/schema';
+import AppShell, { type Tab } from './components/AppShell';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import HomeScreen from './features/home/HomeScreen';
+import PlanScreen from './features/plan/PlanScreen';
 import SessionLogger from './features/logger/SessionLogger';
 import SettingsScreen from './features/settings/SettingsScreen';
 
@@ -10,6 +12,7 @@ type View =
   | { name: 'loading' }
   | { name: 'onboarding' }
   | { name: 'home' }
+  | { name: 'plan' }
   | { name: 'logger'; session: PrescribedSession | null }
   | { name: 'settings' };
 
@@ -19,6 +22,17 @@ function readStravaNotice(): StravaNotice {
   const value = new URLSearchParams(window.location.search).get('strava');
   if (value === 'connected' || value === 'denied' || value === 'error') return value;
   return null;
+}
+
+// Which bottom-tab/sidebar item a given view should show as active, for
+// views reachable both from the nav and from elsewhere (e.g. tapping a
+// specific session's Log button isn't "navigating to Log", but the shell
+// still needs some tab highlighted).
+function activeTabFor(view: View): Tab {
+  if (view.name === 'plan') return 'plan';
+  if (view.name === 'logger') return 'log';
+  if (view.name === 'settings') return 'settings';
+  return 'today';
 }
 
 export default function App() {
@@ -43,10 +57,18 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const navigate = (tab: Tab) => {
+    if (tab === 'today') setView(blockId ? { name: 'home' } : { name: 'onboarding' });
+    else if (tab === 'plan' && blockId) setView({ name: 'plan' });
+    else if (tab === 'log' && blockId) setView({ name: 'logger', session: null });
+    else if (tab === 'settings') setView({ name: 'settings' });
+  };
+
   if (view.name === 'loading') {
     return <main className="min-h-screen bg-bg" />;
   }
 
+  // Onboarding is a focused, full-screen flow -- no nav chrome around it.
   if (view.name === 'onboarding') {
     return (
       <main className="min-h-screen bg-bg text-primary">
@@ -61,17 +83,15 @@ export default function App() {
     );
   }
 
-  if (view.name === 'logger' && blockId) {
-    return (
-      <main className="min-h-screen bg-bg text-primary">
-        <SessionLogger blockId={blockId} session={view.session} onSaved={() => setView({ name: 'home' })} />
-      </main>
-    );
-  }
+  return (
+    <AppShell activeTab={activeTabFor(view)} onNavigate={navigate}>
+      {view.name === 'plan' && blockId && <PlanScreen blockId={blockId} />}
 
-  if (view.name === 'settings') {
-    return (
-      <main className="min-h-screen bg-bg text-primary">
+      {view.name === 'logger' && blockId && (
+        <SessionLogger blockId={blockId} session={view.session} onSaved={() => setView({ name: 'home' })} />
+      )}
+
+      {view.name === 'settings' && (
         <SettingsScreen
           stravaNotice={stravaNotice}
           onBack={() => setView(blockId ? { name: 'home' } : { name: 'onboarding' })}
@@ -80,22 +100,16 @@ export default function App() {
             setView({ name: 'onboarding' });
           }}
         />
-      </main>
-    );
-  }
+      )}
 
-  if (blockId) {
-    return (
-      <main className="min-h-screen bg-bg text-primary">
+      {view.name === 'home' && blockId && (
         <HomeScreen
           blockId={blockId}
           onStartNewBlock={() => setView({ name: 'onboarding' })}
           onLogSession={(session) => setView({ name: 'logger', session })}
           onOpenSettings={() => setView({ name: 'settings' })}
         />
-      </main>
-    );
-  }
-
-  return null;
+      )}
+    </AppShell>
+  );
 }
