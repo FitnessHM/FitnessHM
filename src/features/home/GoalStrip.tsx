@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import type { TrainingBlock, TimedEffort } from '../../db/schema';
@@ -7,8 +7,13 @@ import { DEFAULT_DISCIPLINE, disciplineConfig, disciplineLabel, levelLabel } fro
 import { formatMmSs } from '../../lib/format';
 import Card from '../../components/Card';
 import ProgressRing from '../../components/ProgressRing';
-import ProgressionChart from './ProgressionChart';
+import Skeleton from '../../components/Skeleton';
 import FeasibilityBanner from './FeasibilityBanner';
+
+// recharts is one of the heaviest dependencies in the bundle and this chart
+// only ever renders once the goal strip is expanded -- a separate chunk,
+// fetched on first expand, not part of the initial Home load.
+const ProgressionChart = lazy(() => import('./ProgressionChart'));
 
 interface Props {
   block: TrainingBlock;
@@ -93,7 +98,9 @@ export default function GoalStrip({
           >
             <div className="mt-4 space-y-4 border-t border-border pt-4">
               {feasibility?.isFeasible && <FeasibilityBanner result={feasibility} />}
-              <ProgressionChart efforts={efforts} />
+              <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+                <ProgressionChart efforts={efforts} />
+              </Suspense>
             </div>
           </motion.div>
         )}

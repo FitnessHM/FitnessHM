@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { getActiveBlock } from './db/repository';
 import type { PrescribedSession } from './db/schema';
 import AppShell, { type Tab } from './components/AppShell';
-import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import HomeScreen from './features/home/HomeScreen';
-import PlanScreen from './features/plan/PlanScreen';
-import SessionLogger from './features/logger/SessionLogger';
-import SettingsScreen from './features/settings/SettingsScreen';
+
+// Home is the landing view for almost every session, so it loads eagerly.
+// Everything else is a separate chunk, fetched only when actually
+// navigated to -- onboarding (a one-time flow most sessions never hit
+// again), the logger/settings/plan screens (a tap away, not the first
+// paint).
+const OnboardingWizard = lazy(() => import('./features/onboarding/OnboardingWizard'));
+const PlanScreen = lazy(() => import('./features/plan/PlanScreen'));
+const SessionLogger = lazy(() => import('./features/logger/SessionLogger'));
+const SettingsScreen = lazy(() => import('./features/settings/SettingsScreen'));
 
 type View =
   | { name: 'loading' }
@@ -72,35 +78,39 @@ export default function App() {
   if (view.name === 'onboarding') {
     return (
       <main className="min-h-screen bg-bg text-primary">
-        <OnboardingWizard
-          showWelcome={blockId === null}
-          onComplete={(id) => {
-            setBlockId(id);
-            setView({ name: 'home' });
-          }}
-        />
+        <Suspense fallback={null}>
+          <OnboardingWizard
+            showWelcome={blockId === null}
+            onComplete={(id) => {
+              setBlockId(id);
+              setView({ name: 'home' });
+            }}
+          />
+        </Suspense>
       </main>
     );
   }
 
   return (
     <AppShell activeTab={activeTabFor(view)} onNavigate={navigate}>
-      {view.name === 'plan' && blockId && <PlanScreen blockId={blockId} />}
+      <Suspense fallback={null}>
+        {view.name === 'plan' && blockId && <PlanScreen blockId={blockId} />}
 
-      {view.name === 'logger' && blockId && (
-        <SessionLogger blockId={blockId} session={view.session} onSaved={() => setView({ name: 'home' })} />
-      )}
+        {view.name === 'logger' && blockId && (
+          <SessionLogger blockId={blockId} session={view.session} onSaved={() => setView({ name: 'home' })} />
+        )}
 
-      {view.name === 'settings' && (
-        <SettingsScreen
-          stravaNotice={stravaNotice}
-          onBack={() => setView(blockId ? { name: 'home' } : { name: 'onboarding' })}
-          onStartedOver={() => {
-            setBlockId(null);
-            setView({ name: 'onboarding' });
-          }}
-        />
-      )}
+        {view.name === 'settings' && (
+          <SettingsScreen
+            stravaNotice={stravaNotice}
+            onBack={() => setView(blockId ? { name: 'home' } : { name: 'onboarding' })}
+            onStartedOver={() => {
+              setBlockId(null);
+              setView({ name: 'onboarding' });
+            }}
+          />
+        )}
+      </Suspense>
 
       {view.name === 'home' && blockId && (
         <HomeScreen
